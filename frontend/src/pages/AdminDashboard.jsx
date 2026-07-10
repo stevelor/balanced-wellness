@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import Navbar from '../components/Navbar'
 
 export default function AdminAppointments() {
   const [appointments, setAppointments] = useState([])
@@ -58,6 +59,8 @@ export default function AdminAppointments() {
   }
 
   return (
+    <>
+      <Navbar />
     <div style={{ backgroundColor: '#fff3cd', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
       <h3>Incoming Booking Requests</h3>
       
@@ -114,5 +117,6 @@ export default function AdminAppointments() {
         </table>
       )}
     </div>
+    </>
   )
 }
