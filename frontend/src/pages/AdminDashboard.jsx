@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import AvailabilityManager from '../components/AvailabilityManager'
 import AdminAppointments from '../components/AdminAppointments'
+import Navbar from '../components/Navbar' // NEW: Imported the Navbar
 
 export default function AdminDashboard() {
   const [name, setName] = useState('')
@@ -66,63 +67,68 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px' }}>
-      <h2>Admin Dashboard</h2>
-      <hr style={{ marginBottom: '20px' }} />
+    <>
+      {/* NEW: The Navbar sits at the very top outside the main container */}
+      <Navbar />
 
-      <AdminAppointments />
-      <AvailabilityManager />
-      
-      <div style={{ backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
-        <h3>Add a New Service</h3>
-        <form onSubmit={handleAddService} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Service Name: </label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Duration (minutes): </label>
-            <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Price ($): </label>
-            <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
-          </div>
-          <button type="submit" style={{ padding: '10px', backgroundColor: '#28a745', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', borderRadius: '4px' }}>
-            Save Service
-          </button>
-        </form>
-        {statusMessage && (
-          <p style={{ marginTop: '15px', fontWeight: 'bold', color: statusMessage.includes('Error') ? 'red' : 'green' }}>{statusMessage}</p>
-        )}
-      </div>
+      <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px' }}>
+        <h2>Admin Dashboard</h2>
+        <hr style={{ marginBottom: '20px' }} />
 
-      <div>
-        <h3>Active Services</h3>
-        {servicesList.length === 0 ? (
-          <p>No services added yet.</p>
-        ) : (
-          <ul style={{ listStyleType: 'none', padding: 0 }}>
-            {servicesList.map((service) => (
-              <li key={service.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <strong style={{ fontSize: '1.1em' }}>{service.name}</strong>
-                  <p style={{ margin: '5px 0 0 0', color: '#555' }}>
-                    {service.duration_minutes} minutes | ${service.price.toFixed(2)}
-                  </p>
-                </div>
-                {/* NEW: The Delete Button */}
-                <button 
-                  onClick={() => handleDelete(service.id)} 
-                  style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                >
-                  Delete
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <AdminAppointments />
+        <AvailabilityManager />
+        
+        <div style={{ backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
+          <h3>Add a New Service</h3>
+          <form onSubmit={handleAddService} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Service Name: </label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Duration (minutes): </label>
+              <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Price ($): </label>
+              <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+            </div>
+            <button type="submit" style={{ padding: '10px', backgroundColor: '#28a745', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', borderRadius: '4px' }}>
+              Save Service
+            </button>
+          </form>
+          {statusMessage && (
+            <p style={{ marginTop: '15px', fontWeight: 'bold', color: statusMessage.includes('Error') ? 'red' : 'green' }}>{statusMessage}</p>
+          )}
+        </div>
+
+        <div>
+          <h3>Active Services</h3>
+          {servicesList.length === 0 ? (
+            <p>No services added yet.</p>
+          ) : (
+            <ul style={{ listStyleType: 'none', padding: 0 }}>
+              {servicesList.map((service) => (
+                <li key={service.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <strong style={{ fontSize: '1.1em' }}>{service.name}</strong>
+                    <p style={{ margin: '5px 0 0 0', color: '#555' }}>
+                      {service.duration_minutes} minutes | ${service.price.toFixed(2)}
+                    </p>
+                  </div>
+                  {/* NEW: The Delete Button */}
+                  <button 
+                    onClick={() => handleDelete(service.id)} 
+                    style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
