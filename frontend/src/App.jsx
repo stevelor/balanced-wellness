@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { supabase } from './supabaseClient'; // Ensure this path is correct
-import Auth from './pages/AuthCallback';
+import { supabase } from './supabaseClient'; 
+import Auth from './pages/Auth';
 import ClientPortal from './pages/ClientPortal';
 import AdminDashboard from './pages/AdminDashboard';
 
-// 1. Protected Route Component to handle access logic
+// Protected Route Component to handle access logic
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,17 +17,16 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     });
   }, []);
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>;
 
   if (!session) {
     return <Navigate to="/" replace />;
   }
 
-  // Check the role from the session metadata
   const userRole = session.user.app_metadata.role;
 
   if (!allowedRoles.includes(userRole)) {
-    return <div>Unauthorized Access</div>;
+    return <div style={{ textAlign: 'center', marginTop: '50px' }}>Unauthorized Access</div>;
   }
 
   return children;
@@ -38,9 +37,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Auth />} />
-      <Route path="/portal" element={<ClientPortal />} />
+        <Route path="/portal" element={<ClientPortal />} />
         
-        {/* 2. Wrap the Admin Dashboard with the ProtectedRoute */}
         <Route 
           path="/admin" 
           element={
@@ -49,6 +47,7 @@ function App() {
             </ProtectedRoute>
           } 
         />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

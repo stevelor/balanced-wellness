@@ -1,42 +1,56 @@
-import { useState } from 'react'
-import { supabase } from './supabaseClient'
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabaseClient'; // Points to src/supabaseClient
 
-export default function Auth({ session }) {
-  const [loading, setLoading] = useState(false)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
+export default function Auth() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+
+  useEffect(() => {
+    // 1. Check if they already have a valid session right now
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/portal'); // Redirects to your portal route
+      } else {
+        setIsVerifying(false);
+      }
+    });
+
+    // 2. Listen for auth updates (like clicking the email link)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        navigate('/portal');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleAuth = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+    e.preventDefault();
+    setLoading(true);
     
     if (isSignUp) {
-      // Supabase handles the actual account creation here
-      const { error } = await supabase.auth.signUp({ email, password })
-      if (error) alert(error.message)
-      else alert('Check your email for the confirmation link!')
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) alert(error.message);
+      else alert('Check your email for the confirmation link!');
     } else {
-      // Supabase checks the credentials and logs the user in
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) alert(error.message)
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) alert(error.message);
     }
-    setLoading(false)
+    setLoading(false);
+  };
+
+  if (isVerifying) {
+    return <div style={{ textAlign: 'center', marginTop: '50px', fontFamily: 'sans-serif' }}>Verifying your account...</div>;
   }
 
-  // If the user is already logged in, show a welcome message and a logout button
-  if (session) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <h3>Logged in as: {session.user.email}</h3>
-        <button onClick={() => supabase.auth.signOut()}>Log Out</button>
-      </div>
-    )
-  }
-
-  // If not logged in, show the form
   return (
-    <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
+    <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px', fontFamily: 'sans-serif' }}>
       <h2 style={{ textAlign: 'center' }}>{isSignUp ? 'Create Account' : 'Client Login'}</h2>
       <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
         <div>
@@ -46,7 +60,7 @@ export default function Auth({ session }) {
             value={email} 
             onChange={(e) => setEmail(e.target.value)} 
             required 
-            style={{ width: '100%', padding: '8px' }}
+            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
           />
         </div>
         <div>
@@ -56,10 +70,10 @@ export default function Auth({ session }) {
             value={password} 
             onChange={(e) => setPassword(e.target.value)} 
             required 
-            style={{ width: '100%', padding: '8px' }}
+            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
           />
         </div>
-        <button type="submit" disabled={loading} style={{ padding: '10px', cursor: 'pointer' }}>
+        <button type="submit" disabled={loading} style={{ padding: '10px', cursor: 'pointer', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
           {loading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Log In'}
         </button>
       </form>
@@ -70,5 +84,5 @@ export default function Auth({ session }) {
         {isSignUp ? 'Already have an account? Log In' : 'Need an account? Sign Up'}
       </p>
     </div>
-  )
+  );
 }
