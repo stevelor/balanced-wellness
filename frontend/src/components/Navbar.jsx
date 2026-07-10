@@ -1,13 +1,24 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import { useState, useEffect } from 'react'
 
 export default function Navbar() {
   const navigate = useNavigate()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // NEW: Check the user's role when the Navbar loads
+  useEffect(() => {
+    const checkUserRole = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user?.app_metadata?.role === 'admin') {
+        setIsAdmin(true)
+      }
+    }
+    checkUserRole()
+  }, [])
 
   const handleLogout = async () => {
-    // Tell Supabase to destroy the active session
     await supabase.auth.signOut()
-    // Kick the user back to the login screen
     navigate('/')
   }
 
@@ -27,9 +38,14 @@ export default function Navbar() {
         <Link to="/portal" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bold' }}>
           Client Portal
         </Link>
-        <Link to="/admin" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bold' }}>
-          Admin Dashboard
-        </Link>
+        
+        {/* NEW: Conditionally render the Admin Dashboard link */}
+        {isAdmin && (
+          <Link to="/admin" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bold' }}>
+            Admin Dashboard
+          </Link>
+        )}
+        
         <button 
           onClick={handleLogout} 
           style={{ 
