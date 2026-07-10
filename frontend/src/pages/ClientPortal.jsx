@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import Navbar from '../components/Navbar'
+import DatePicker from "react-datepicker"
+import "react-datepicker/dist/react-datepicker.css"
 
 export default function ClientPortal() {
   const [services, setServices] = useState([])
   const [availability, setAvailability] = useState([]) 
   const [selectedService, setSelectedService] = useState('')
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('')
+  const [date, setDate] = useState(null) // Changed to null for DatePicker
+  const [time, setTime] = useState(null) // Changed to null for DatePicker
   const [statusMessage, setStatusMessage] = useState('')
   const [myAppointments, setMyAppointments] = useState([])
 
@@ -47,10 +49,18 @@ export default function ClientPortal() {
       setStatusMessage("Please select a healing service for your session.")
       return
     }
+    if (!date || !time) {
+      setStatusMessage("Please select both a valid date and time.")
+      return
+    }
 
     setStatusMessage('Checking schedule...')
     
-    const dayOfWeek = new Date(`${date}T00:00:00`).getDay() 
+    // Format the Date objects for Supabase (YYYY-MM-DD and HH:MM)
+    const formattedDate = date.toLocaleDateString('en-CA') 
+    const formattedTime = time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    
+    const dayOfWeek = date.getDay() 
     const dayRules = availability.filter(a => a.day_of_week === dayOfWeek)
     
     if (dayRules.length === 0) {
@@ -61,7 +71,7 @@ export default function ClientPortal() {
     const isValidTime = dayRules.some(rule => {
       const ruleStart = rule.start_time.substring(0, 5)
       const ruleEnd = rule.end_time.substring(0, 5)
-      return time >= ruleStart && time <= ruleEnd
+      return formattedTime >= ruleStart && formattedTime <= ruleEnd
     })
 
     if (!isValidTime) {
@@ -78,8 +88,8 @@ export default function ClientPortal() {
         {
           client_id: user.id,
           service_id: selectedService,
-          appointment_date: date,
-          start_time: time,
+          appointment_date: formattedDate,
+          start_time: formattedTime,
           status: 'pending'
         }
       ])
@@ -89,14 +99,11 @@ export default function ClientPortal() {
     } else {
       setStatusMessage('Your session has been successfully requested!')
       setSelectedService('')
-      setDate('')
-      setTime('')
+      setDate(null)
+      setTime(null)
       fetchMyAppointments() 
     }
   }
-
-  // Calculate today's date in YYYY-MM-DD format to prevent clients from booking in the past
-  const today = new Date().toISOString().split('T')[0]
 
   return (
     <>
@@ -149,47 +156,30 @@ export default function ClientPortal() {
               </div>
             </div>
 
-            {/* CHANGED: Upgraded Date and Time Inputs */}
             <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginTop: '5px' }}>
               <div style={{ flex: '1 1 200px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#2c3e50' }}>Choose a Date:</label>
-                <input 
-                  type="date" 
-                  value={date} 
-                  min={today} 
-                  onChange={(e) => setDate(e.target.value)} 
-                  required 
-                  style={{ 
-                    width: '100%', 
-                    padding: '12px', 
-                    border: '1px solid #ddd', 
-                    borderRadius: '8px', 
-                    backgroundColor: '#fff',
-                    color: '#333',
-                    fontSize: '1rem',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                    outline: 'none'
-                  }} 
+                <DatePicker 
+                  selected={date} 
+                  onChange={(d) => setDate(d)} 
+                  minDate={new Date()} 
+                  placeholderText="Select your date"
+                  dateFormat="MMMM d, yyyy"
+                  required
                 />
               </div>
               <div style={{ flex: '1 1 200px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#2c3e50' }}>Choose a Time:</label>
-                <input 
-                  type="time" 
-                  value={time} 
-                  onChange={(e) => setTime(e.target.value)} 
-                  required 
-                  style={{ 
-                    width: '100%', 
-                    padding: '12px', 
-                    border: '1px solid #ddd', 
-                    borderRadius: '8px', 
-                    backgroundColor: '#fff',
-                    color: '#333',
-                    fontSize: '1rem',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                    outline: 'none'
-                  }} 
+                <DatePicker 
+                  selected={time} 
+                  onChange={(t) => setTime(t)} 
+                  showTimeSelect 
+                  showTimeSelectOnly
+                  timeIntervals={30}
+                  timeCaption="Time"
+                  dateFormat="h:mm aa"
+                  placeholderText="Select your time"
+                  required
                 />
               </div>
             </div>
