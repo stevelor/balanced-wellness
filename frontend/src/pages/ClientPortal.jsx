@@ -1,17 +1,99 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import Navbar from '../components/Navbar' // 1. Add this import at the top!
+import Navbar from '../components/Navbar' // The new import!
 
 export default function ClientPortal() {
-  // ... [Keep all your existing state variables and functions exactly the same] ...
+  const [services, setServices] = useState([])
+  const [availability, setAvailability] = useState([]) 
+  const [selectedService, setSelectedService] = useState('')
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('')
+  const [statusMessage, setStatusMessage] = useState('')
+  const [myAppointments, setMyAppointments] = useState([])
 
-  // 2. Update your return statement to look like this:
+  useEffect(() => {
+    fetchServices()
+    fetchMyAppointments()
+    fetchAvailability() 
+  }, [])
+
+  const fetchServices = async () => {
+    const { data, error } = await supabase.from('services').select('*')
+    if (!error) setServices(data)
+  }
+
+  const fetchAvailability = async () => {
+    const { data, error } = await supabase.from('availability').select('*')
+    if (!error) setAvailability(data)
+  }
+
+  const fetchMyAppointments = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`id, appointment_date, start_time, status, services (name)`)
+        .eq('client_id', user.id)
+        .order('appointment_date', { ascending: true })
+
+      if (!error) setMyAppointments(data)
+    }
+  }
+
+  const handleBooking = async (e) => {
+    e.preventDefault()
+    setStatusMessage('Validating schedule...')
+    
+    const dayOfWeek = new Date(`${date}T00:00:00`).getDay() 
+    const dayRules = availability.filter(a => a.day_of_week === dayOfWeek)
+    
+    if (dayRules.length === 0) {
+      setStatusMessage("Error: The business is closed on this day of the week.")
+      return 
+    }
+
+    const isValidTime = dayRules.some(rule => {
+      const ruleStart = rule.start_time.substring(0, 5)
+      const ruleEnd = rule.end_time.substring(0, 5)
+      return time >= ruleStart && time <= ruleEnd
+    })
+
+    if (!isValidTime) {
+      setStatusMessage("Error: The selected time falls outside of operating hours.")
+      return 
+    }
+
+    setStatusMessage('Booking appointment...')
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { error } = await supabase
+      .from('appointments')
+      .insert([
+        {
+          client_id: user.id,
+          service_id: selectedService,
+          appointment_date: date,
+          start_time: time,
+          status: 'pending'
+        }
+      ])
+
+    if (error) {
+      setStatusMessage(`Error: ${error.message}`)
+    } else {
+      setStatusMessage('Appointment booked successfully!')
+      setSelectedService('')
+      setDate('')
+      setTime('')
+      fetchMyAppointments() 
+    }
+  }
+
   return (
     <>
-      {/* 3. Drop your Navbar right at the top of the page */}
+      {/* Your Navbar successfully added to the top */}
       <Navbar />
       
-      {/* Your existing portal content remains wrapped in its centered div */}
       <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px' }}>
         <h2>Client Booking Portal</h2>
         <hr style={{ marginBottom: '20px' }} />
