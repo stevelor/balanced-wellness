@@ -43,7 +43,6 @@ export default function ClientPortal() {
   const handleBooking = async (e) => {
     e.preventDefault()
     
-    // CHANGED: Safety check to make sure a service card is clicked!
     if (!selectedService) {
       setStatusMessage("Please select a healing service for your session.")
       return
@@ -96,6 +95,9 @@ export default function ClientPortal() {
     }
   }
 
+  // Calculate today's date in YYYY-MM-DD format to prevent clients from booking in the past
+  const today = new Date().toISOString().split('T')[0]
+
   return (
     <>
       <Navbar />
@@ -122,7 +124,6 @@ export default function ClientPortal() {
 
           <form onSubmit={handleBooking} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
-            {/* CHANGED: Replaced the dropdown select with a responsive CSS grid of cards */}
             <div>
               <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500' }}>How can we help you heal today?</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
@@ -148,18 +149,52 @@ export default function ClientPortal() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+            {/* CHANGED: Upgraded Date and Time Inputs */}
+            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginTop: '5px' }}>
               <div style={{ flex: '1 1 200px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Date:</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} />
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#2c3e50' }}>Choose a Date:</label>
+                <input 
+                  type="date" 
+                  value={date} 
+                  min={today} 
+                  onChange={(e) => setDate(e.target.value)} 
+                  required 
+                  style={{ 
+                    width: '100%', 
+                    padding: '12px', 
+                    border: '1px solid #ddd', 
+                    borderRadius: '8px', 
+                    backgroundColor: '#fff',
+                    color: '#333',
+                    fontSize: '1rem',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                    outline: 'none'
+                  }} 
+                />
               </div>
               <div style={{ flex: '1 1 200px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Time:</label>
-                <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} />
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#2c3e50' }}>Choose a Time:</label>
+                <input 
+                  type="time" 
+                  value={time} 
+                  onChange={(e) => setTime(e.target.value)} 
+                  required 
+                  style={{ 
+                    width: '100%', 
+                    padding: '12px', 
+                    border: '1px solid #ddd', 
+                    borderRadius: '8px', 
+                    backgroundColor: '#fff',
+                    color: '#333',
+                    fontSize: '1rem',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                    outline: 'none'
+                  }} 
+                />
               </div>
             </div>
             
-            <button type="submit" style={{ padding: '12px', backgroundColor: '#899E8B', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'background-color 0.3s ease', marginTop: '10px' }}>
+            <button type="submit" style={{ padding: '14px', backgroundColor: '#899E8B', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.05rem', transition: 'background-color 0.3s ease', marginTop: '10px', boxShadow: '0 4px 6px rgba(137, 158, 139, 0.2)' }}>
               Reserve My Time
             </button>
           </form>
@@ -174,7 +209,7 @@ export default function ClientPortal() {
           ) : (
             <ul style={{ listStyleType: 'none', padding: 0 }}>
               {myAppointments.map((apt) => (
-                <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '4px', backgroundColor: '#fff' }}>
+                <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                   <strong style={{ fontSize: '1.1em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
                   <span style={{ color: '#666', display: 'block', margin: '5px 0' }}>Date: {apt.appointment_date} at {apt.start_time.substring(0, 5)}</span>
                   <span style={{ display: 'inline-block', marginTop: '5px', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', fontWeight: '500', backgroundColor: apt.status === 'pending' ? '#FDE68A' : apt.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2', color: apt.status === 'pending' ? '#92400E' : apt.status === 'confirmed' ? '#065F46' : '#991B1B' }}>
