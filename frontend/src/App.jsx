@@ -38,7 +38,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Auth />} />
-        <Route path="/client-portal" element={<ClientPortal />} />
+        <Route path="/portal" element={<ClientPortal />} />
         
         {/* 2. Wrap the Admin Dashboard with the ProtectedRoute */}
         <Route 
