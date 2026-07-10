@@ -1,122 +1,133 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import Navbar from '../components/Navbar'
+import AvailabilityManager from '../components/AvailabilityManager'
+import AdminAppointments from '../components/AdminAppointments'
+import Navbar from '../components/Navbar' // The Navbar is imported here!
 
-export default function AdminAppointments() {
-  const [appointments, setAppointments] = useState([])
+export default function AdminDashboard() {
+  const [name, setName] = useState('')
+  const [duration, setDuration] = useState('')
+  const [price, setPrice] = useState('')
+  const [statusMessage, setStatusMessage] = useState('')
+  const [servicesList, setServicesList] = useState([])
 
   useEffect(() => {
-    fetchAppointments()
+    fetchServices()
   }, [])
 
-  const fetchAppointments = async () => {
+  const fetchServices = async () => {
     const { data, error } = await supabase
-      .from('appointments')
-      .select(`
-        id,
-        appointment_date,
-        start_time,
-        status,
-        services (name)
-      `)
-      .order('appointment_date', { ascending: true })
+      .from('services')
+      .select('*')
+      .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching appointments:', error)
+      console.error('Error fetching services:', error)
     } else {
-      setAppointments(data)
+      setServicesList(data)
     }
   }
 
-  const updateStatus = async (id, newStatus) => {
+  const handleAddService = async (e) => {
+    e.preventDefault()
+    setStatusMessage('Adding service...')
+
     const { error } = await supabase
-      .from('appointments')
-      .update({ status: newStatus })
-      .eq('id', id)
+      .from('services')
+      .insert([{ name: name, duration_minutes: parseInt(duration), price: parseFloat(price) }])
 
     if (error) {
-      alert(`Error updating status: ${error.message}`)
+      setStatusMessage(`Error: ${error.message}`)
     } else {
-      fetchAppointments() // Refresh the list instantly
+      setStatusMessage('Service added successfully!')
+      setName('')
+      setDuration('')
+      setPrice('')
+      fetchServices() 
     }
   }
 
-  // NEW: Function to permanently delete an appointment
-  const deleteAppointment = async (id) => {
-    const confirmDelete = window.confirm("Are you sure you want to permanently delete this appointment?")
+  const handleDelete = async (id) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this service?")
     if (!confirmDelete) return
 
     const { error } = await supabase
-      .from('appointments')
+      .from('services')
       .delete()
-      .eq('id', id)
+      .eq('id', id) 
 
     if (error) {
-      alert(`Error deleting appointment: ${error.message}`)
+      alert(`Error deleting: ${error.message}`)
     } else {
-      fetchAppointments() // Refresh to clear it from the screen
+      fetchServices()
     }
   }
 
   return (
     <>
+      {/* The Navbar spans the top of the screen outside the main container */}
       <Navbar />
-    <div style={{ backgroundColor: '#fff3cd', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
-      <h3>Incoming Booking Requests</h3>
-      
-      {appointments.length === 0 ? (
-        <p>No appointments booked yet.</p>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white' }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid #ccc' }}>
-              <th style={{ textAlign: 'left', padding: '10px' }}>Service</th>
-              <th style={{ textAlign: 'left', padding: '10px' }}>Date & Time</th>
-              <th style={{ textAlign: 'center', padding: '10px' }}>Status</th>
-              <th style={{ textAlign: 'right', padding: '10px' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {appointments.map(apt => (
-              <tr key={apt.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '10px', fontWeight: 'bold' }}>{apt.services?.name}</td>
-                <td style={{ padding: '10px' }}>
-                  {apt.appointment_date} @ {apt.start_time.substring(0, 5)}
-                </td>
-                <td style={{ padding: '10px', textAlign: 'center' }}>
-                  <span style={{ 
-                    padding: '4px 8px', 
-                    borderRadius: '12px', 
-                    fontSize: '0.85em',
-                    backgroundColor: apt.status === 'confirmed' ? '#28a745' : apt.status === 'cancelled' ? '#dc3545' : '#ffc107',
-                    color: apt.status === 'pending' ? '#000' : '#fff'
-                  }}>
-                    {apt.status.toUpperCase()}
-                  </span>
-                </td>
-                <td style={{ padding: '10px', textAlign: 'right' }}>
-                  {/* Status Buttons */}
-                  {apt.status === 'pending' && (
-                    <>
-                      <button onClick={() => updateStatus(apt.id, 'confirmed')} style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}>
-                        Confirm
-                      </button>
-                      <button onClick={() => updateStatus(apt.id, 'cancelled')} style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}>
-                        Cancel
-                      </button>
-                    </>
-                  )}
-                  {/* NEW: Delete Button (Visible for all statuses so you can clear history) */}
-                  <button onClick={() => deleteAppointment(apt.id)} style={{ backgroundColor: '#6c757d', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer' }}>
+
+      <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px' }}>
+        <h2>Admin Dashboard</h2>
+        <hr style={{ marginBottom: '20px' }} />
+
+        {/* Your imported management components */}
+        <AdminAppointments />
+        <AvailabilityManager />
+        
+        {/* Your Services form */}
+        <div style={{ backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
+          <h3>Add a New Service</h3>
+          <form onSubmit={handleAddService} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Service Name: </label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Duration (minutes): </label>
+              <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Price ($): </label>
+              <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+            </div>
+            <button type="submit" style={{ padding: '10px', backgroundColor: '#28a745', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', borderRadius: '4px' }}>
+              Save Service
+            </button>
+          </form>
+          {statusMessage && (
+            <p style={{ marginTop: '15px', fontWeight: 'bold', color: statusMessage.includes('Error') ? 'red' : 'green' }}>{statusMessage}</p>
+          )}
+        </div>
+
+        {/* Your Active Services list */}
+        <div>
+          <h3>Active Services</h3>
+          {servicesList.length === 0 ? (
+            <p>No services added yet.</p>
+          ) : (
+            <ul style={{ listStyleType: 'none', padding: 0 }}>
+              {servicesList.map((service) => (
+                <li key={service.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <strong style={{ fontSize: '1.1em' }}>{service.name}</strong>
+                    <p style={{ margin: '5px 0 0 0', color: '#555' }}>
+                      {service.duration_minutes} minutes | ${service.price.toFixed(2)}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => handleDelete(service.id)} 
+                    style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
                     Delete
                   </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </>
   )
 }
