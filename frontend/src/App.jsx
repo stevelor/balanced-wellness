@@ -1,44 +1,57 @@
-import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { supabase } from './supabaseClient'
-import Auth from './Auth'
-import ClientPortal from './pages/ClientPortal'
-import AdminDashboard from './pages/AdminDashboard'
-import Navbar from './components/Navbar'
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { supabase } from './supabaseClient'; // Ensure this path is correct
+import Auth from './pages/Auth';
+import ClientPortal from './pages/ClientPortal';
+import AdminDashboard from './pages/AdminDashboard';
 
-export default function App() {
-  const [session, setSession] = useState(null)
+// 1. Protected Route Component to handle access logic
+const ProtectedRoute = ({ children, allowedRoles }) => {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Check if the user is logged in when the page first loads
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-    })
+      setSession(session);
+      setLoading(false);
+    });
+  }, []);
 
-    // 2. Set up a listener for any login/logout events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
+  if (loading) return <div>Loading...</div>;
 
-    // Clean up the listener if the app closes
-    return () => subscription.unsubscribe()
-  }, [])
+  if (!session) {
+    return <Navigate to="/" replace />;
+  }
 
+  // Check the role from the session metadata
+  const userRole = session.user.app_metadata.role;
+
+  if (!allowedRoles.includes(userRole)) {
+    return <div>Unauthorized Access</div>;
+  }
+
+  return children;
+};
+
+function App() {
   return (
-    <Router>
-      {/* SECURITY: Only render the Navbar if a session exists */}
-      {session && <Navbar />}
-      
+    <BrowserRouter>
       <Routes>
-        {/* If NOT logged in, show Auth screen. If logged in, push to Portal */}
-        <Route path="/" element={!session ? <Auth /> : <Navigate to="/portal" />} />
+        <Route path="/" element={<Auth />} />
+        <Route path="/client-portal" element={<ClientPortal />} />
         
-        {/* If logged in, show Portal. If NOT logged in, kick back to Auth ("/") */}
-        <Route path="/portal" element={session ? <ClientPortal /> : <Navigate to="/" />} />
-        
-        {/* If logged in, show Admin. If NOT logged in, kick back to Auth ("/") */}
-        <Route path="/admin" element={session ? <AdminDashboard /> : <Navigate to="/" />} />
+        {/* 2. Wrap the Admin Dashboard with the ProtectedRoute */}
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
       </Routes>
-    </Router>
-  )
+    </BrowserRouter>
+  );
 }
+
+export default App;
