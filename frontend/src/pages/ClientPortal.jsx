@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import Navbar from '../components/Navbar' // The new import!
+import Navbar from '../components/Navbar'
 
 export default function ClientPortal() {
   const [services, setServices] = useState([])
@@ -42,13 +42,20 @@ export default function ClientPortal() {
 
   const handleBooking = async (e) => {
     e.preventDefault()
-    setStatusMessage('Validating schedule...')
+    
+    // CHANGED: Safety check to make sure a service card is clicked!
+    if (!selectedService) {
+      setStatusMessage("Please select a healing service for your session.")
+      return
+    }
+
+    setStatusMessage('Checking schedule...')
     
     const dayOfWeek = new Date(`${date}T00:00:00`).getDay() 
     const dayRules = availability.filter(a => a.day_of_week === dayOfWeek)
     
     if (dayRules.length === 0) {
-      setStatusMessage("Error: The business is closed on this day of the week.")
+      setStatusMessage("We are currently closed on this day of the week. Please select another day.")
       return 
     }
 
@@ -59,11 +66,11 @@ export default function ClientPortal() {
     })
 
     if (!isValidTime) {
-      setStatusMessage("Error: The selected time falls outside of operating hours.")
+      setStatusMessage("The selected time falls outside of our available hours. Please choose a different time.")
       return 
     }
 
-    setStatusMessage('Booking appointment...')
+    setStatusMessage('Reserving your time...')
     const { data: { user } } = await supabase.auth.getUser()
 
     const { error } = await supabase
@@ -81,7 +88,7 @@ export default function ClientPortal() {
     if (error) {
       setStatusMessage(`Error: ${error.message}`)
     } else {
-      setStatusMessage('Appointment booked successfully!')
+      setStatusMessage('Your session has been successfully requested!')
       setSelectedService('')
       setDate('')
       setTime('')
@@ -91,19 +98,18 @@ export default function ClientPortal() {
 
   return (
     <>
-      {/* Your Navbar successfully added to the top */}
       <Navbar />
       
-      <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px' }}>
-        <h2>Client Booking Portal</h2>
-        <hr style={{ marginBottom: '20px' }} />
+      <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px' }}>
+        <h2>Schedule Your Healing Session</h2>
+        <hr style={{ marginBottom: '20px', border: 'none', borderBottom: '1px solid #ddd' }} />
 
-        <div style={{ backgroundColor: '#e8f4f8', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
-          <h3>Book an Appointment</h3>
+        <div style={{ backgroundColor: '#F4F1EA', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
+          <h3>Book Your Session</h3>
           
           {availability.length > 0 && (
-            <div style={{ backgroundColor: '#fff', padding: '10px', borderRadius: '4px', fontSize: '0.85em', color: '#555', marginBottom: '15px' }}>
-              <strong>Operating Hours:</strong>
+            <div style={{ backgroundColor: '#fff', padding: '10px', borderRadius: '4px', fontSize: '0.85em', color: '#555', marginBottom: '20px' }}>
+              <strong>Available Hours:</strong>
               <ul style={{ margin: '5px 0 0 0', paddingLeft: '20px' }}>
                 {availability.map(a => (
                   <li key={a.id}>
@@ -114,46 +120,65 @@ export default function ClientPortal() {
             </div>
           )}
 
-          <form onSubmit={handleBooking} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <form onSubmit={handleBooking} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* CHANGED: Replaced the dropdown select with a responsive CSS grid of cards */}
             <div>
-              <label style={{ display: 'block', marginBottom: '5px' }}>Select a Service:</label>
-              <select value={selectedService} onChange={(e) => setSelectedService(e.target.value)} required style={{ width: '100%', padding: '8px' }}>
-                <option value="" disabled>-- Choose a service --</option>
+              <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500' }}>How can we help you heal today?</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
                 {services.map(service => (
-                  <option key={service.id} value={service.id}>
-                    {service.name} ({service.duration_minutes} min) - ${service.price}
-                  </option>
+                  <div 
+                    key={service.id}
+                    onClick={() => setSelectedService(service.id)}
+                    style={{
+                      padding: '15px',
+                      border: selectedService === service.id ? '2px solid #899E8B' : '1px solid #ddd',
+                      borderRadius: '8px',
+                      backgroundColor: selectedService === service.id ? '#e9efe9' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: selectedService === service.id ? '0 4px 8px rgba(0,0,0,0.05)' : 'none'
+                    }}
+                  >
+                    <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50', fontSize: '1.1em' }}>{service.name}</h4>
+                    <p style={{ margin: '0 0 5px 0', fontSize: '0.9em', color: '#666' }}>{service.duration_minutes} minutes</p>
+                    <p style={{ margin: '0', fontWeight: 'bold', color: '#899E8B' }}>${service.price.toFixed(2)}</p>
+                  </div>
                 ))}
-              </select>
+              </div>
             </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px' }}>Date:</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+
+            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Date:</label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} />
+              </div>
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Time:</label>
+                <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} />
+              </div>
             </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px' }}>Time:</label>
-              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
-            </div>
-            <button type="submit" style={{ padding: '10px', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-              Submit Booking Request
+            
+            <button type="submit" style={{ padding: '12px', backgroundColor: '#899E8B', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'background-color 0.3s ease', marginTop: '10px' }}>
+              Reserve My Time
             </button>
           </form>
           
-          {statusMessage && <p style={{ marginTop: '15px', fontWeight: 'bold', color: statusMessage.includes('Error') ? 'red' : 'green' }}>{statusMessage}</p>}
+          {statusMessage && <p style={{ marginTop: '15px', fontWeight: 'bold', color: statusMessage.includes('Error') || statusMessage.includes('closed') || statusMessage.includes('outside') || statusMessage.includes('Please select') ? '#D9534F' : '#899E8B' }}>{statusMessage}</p>}
         </div>
 
         <div>
-          <h3>My Upcoming Appointments</h3>
+          <h3>Your Upcoming Sessions</h3>
           {myAppointments.length === 0 ? (
-            <p>You have no pending or upcoming appointments.</p>
+            <p style={{ color: '#666' }}>You have no upcoming sessions at this time.</p>
           ) : (
             <ul style={{ listStyleType: 'none', padding: 0 }}>
               {myAppointments.map((apt) => (
-                <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '4px' }}>
-                  <strong style={{ fontSize: '1.1em', display: 'block' }}>{apt.services?.name}</strong>
-                  <span style={{ color: '#555' }}>Date: {apt.appointment_date} at {apt.start_time.substring(0, 5)}</span>
-                  <span style={{ display: 'inline-block', marginLeft: '15px', padding: '3px 8px', borderRadius: '12px', fontSize: '0.8em', backgroundColor: apt.status === 'pending' ? '#ffc107' : apt.status === 'confirmed' ? '#28a745' : '#dc3545', color: apt.status === 'pending' ? '#000' : '#fff' }}>
-                    {apt.status.toUpperCase()}
+                <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '4px', backgroundColor: '#fff' }}>
+                  <strong style={{ fontSize: '1.1em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
+                  <span style={{ color: '#666', display: 'block', margin: '5px 0' }}>Date: {apt.appointment_date} at {apt.start_time.substring(0, 5)}</span>
+                  <span style={{ display: 'inline-block', marginTop: '5px', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', fontWeight: '500', backgroundColor: apt.status === 'pending' ? '#FDE68A' : apt.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2', color: apt.status === 'pending' ? '#92400E' : apt.status === 'confirmed' ? '#065F46' : '#991B1B' }}>
+                    {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
                   </span>
                 </li>
               ))}

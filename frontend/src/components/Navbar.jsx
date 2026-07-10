@@ -6,7 +6,6 @@ export default function Navbar() {
   const navigate = useNavigate()
   const [isAdmin, setIsAdmin] = useState(false)
 
-  // NEW: Check the user's role when the Navbar loads
   useEffect(() => {
     const checkUserRole = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -25,37 +24,50 @@ export default function Navbar() {
   return (
     <nav style={{ 
       padding: '15px 30px', 
-      backgroundColor: '#2c3e50', 
-      color: 'white', 
+      backgroundColor: '#ffffff', // Softened to white for a cleaner, premium look
       display: 'flex', 
       justifyContent: 'space-between', 
       alignItems: 'center',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+      borderBottom: '1px solid #eaeaea'
     }}>
-      <h2 style={{ margin: 0, fontSize: '1.5em' }}>Balanced Wellness</h2>
+      {/* Updated to match the new Lora serif font and sage green brand color */}
+      <h2 style={{ margin: 0, fontSize: '1.5em', fontFamily: '"Lora", serif', color: '#899E8B' }}>
+        Balanced Wellness
+      </h2>
       
-      <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-        <Link to="/portal" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bold' }}>
-          Client Portal
+      <div style={{ display: 'flex', gap: '25px', alignItems: 'center' }}>
+        
+        {/* CHANGED: The Escape Hatch link back to Donna's main Wix site */}
+        <a 
+          href="https://www.healwithdonna.com/" 
+          style={{ color: '#555', textDecoration: 'none', fontWeight: '500' }}
+        >
+          Return to Main Website
+        </a>
+
+        <Link to="/portal" style={{ color: '#555', textDecoration: 'none', fontWeight: '500' }}>
+          Portal Home
         </Link>
         
-        {/* NEW: Conditionally render the Admin Dashboard link */}
         {isAdmin && (
-          <Link to="/admin" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bold' }}>
+          <Link to="/admin" style={{ color: '#555', textDecoration: 'none', fontWeight: '500' }}>
             Admin Dashboard
           </Link>
         )}
         
+        {/* Updated logout button to be less harsh than the bright red */}
         <button 
           onClick={handleLogout} 
           style={{ 
-            backgroundColor: '#e74c3c', 
-            color: 'white', 
-            border: 'none', 
-            padding: '8px 15px', 
+            backgroundColor: '#F4F1EA', 
+            color: '#555', 
+            border: '1px solid #ddd', 
+            padding: '8px 16px', 
             borderRadius: '4px', 
             cursor: 'pointer',
-            fontWeight: 'bold'
+            fontWeight: '600',
+            transition: 'background-color 0.3s ease'
           }}
         >
           Logout
