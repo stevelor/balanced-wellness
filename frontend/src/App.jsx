@@ -26,7 +26,46 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const userRole = session.user.app_metadata.role;
 
   if (!allowedRoles.includes(userRole)) {
-    return <div style={{ textAlign: 'center', marginTop: '50px' }}>Unauthorized Access</div>;
+    return (
+      <div style={{ textAlign: 'center', marginTop: '100px', fontFamily: 'sans-serif' }}>
+        <h2>Unauthorized Access</h2>
+        <p style={{ marginBottom: '20px' }}>You do not have permission to view the admin dashboard.</p>
+        
+        <button 
+          onClick={async () => {
+            await supabase.auth.signOut();
+            window.location.href = '/'; // Send back to login
+          }}
+          style={{ 
+            padding: '10px 20px', 
+            backgroundColor: '#e74c3c', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px', 
+            cursor: 'pointer', 
+            marginRight: '10px',
+            fontWeight: 'bold'
+          }}
+        >
+          Log Out
+        </button>
+
+        <button 
+          onClick={() => window.location.href = '/portal'}
+          style={{ 
+            padding: '10px 20px', 
+            backgroundColor: '#3498db', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px', 
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          Return to Portal
+        </button>
+      </div>
+    );
   }
 
   return children;
