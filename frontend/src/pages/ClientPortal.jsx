@@ -82,6 +82,7 @@ export default function ClientPortal() {
       .insert([
         {
           client_id: user.id,
+          client_email: user.email,
           service_id: selectedService,
           appointment_date: formattedDate,
           start_time: formattedTime,
@@ -97,6 +98,18 @@ export default function ClientPortal() {
       setDate(null)
       setTime(null)
       refetchMyAppointments()
+
+      // Let the admin know a new booking came in — don't block the UI if this fails
+      const bookedService = services.find(s => s.id === selectedService)
+      supabase.functions.invoke('send-email', {
+        body: {
+          type: 'new_appointment',
+          serviceName: bookedService?.name ?? 'Unknown service',
+          appointmentDate: formattedDate,
+          startTime: formattedTime,
+          clientEmail: user.email,
+        },
+      }).catch(err => console.error('Email notification failed:', err))
     }
   }
 

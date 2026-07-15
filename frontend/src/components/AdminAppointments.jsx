@@ -11,6 +11,7 @@ export default function AdminAppointments() {
       appointment_date,
       start_time,
       status,
+      client_email,
       services (name)
     `,
     orderBy: 'appointment_date',
@@ -18,6 +19,8 @@ export default function AdminAppointments() {
   })
 
   const updateStatus = async (id, newStatus) => {
+    const appointment = appointments.find(a => a.id === id)
+
     const { error } = await supabase
       .from('appointments')
       .update({ status: newStatus })
@@ -25,8 +28,23 @@ export default function AdminAppointments() {
 
     if (error) {
       alert(`Error updating status: ${error.message}`)
-    } else {
-      refetch() // Refresh the list instantly
+      return
+    }
+
+    refetch() // Refresh the list instantly
+
+    // Let the client know by email — don't block the UI if this fails
+    if (appointment) {
+      supabase.functions.invoke('send-email', {
+        body: {
+          type: 'status_update',
+          serviceName: appointment.services?.name ?? 'Unknown service',
+          appointmentDate: appointment.appointment_date,
+          startTime: appointment.start_time,
+          clientEmail: appointment.client_email,
+          status: newStatus,
+        },
+      }).catch(err => console.error('Email notification failed:', err))
     }
   }
 
