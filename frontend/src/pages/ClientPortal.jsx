@@ -94,6 +94,15 @@ export default function ClientPortal() {
       setStatusMessage(`Error: ${error.message}`)
     } else {
       setStatusMessage('Your session has been successfully requested!')
+      await supabase.functions.invoke('send-email', {
+        body: { 
+          clientEmail: user.email, 
+          clientName: user.user_metadata?.full_name || '',
+          serviceName: services.find(s => s.id === selectedService)?.name,
+          date: formattedDate,
+          time: formattedTime
+        }
+      })
       setSelectedService('')
       setDate(null)
       setTime(null)
