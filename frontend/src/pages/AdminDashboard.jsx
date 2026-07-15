@@ -6,6 +6,7 @@ import AdminAppointments from '../components/AdminAppointments'
 import Navbar from '../components/Navbar'
 import Card from '../components/Card'
 import Button from '../components/Button'
+import ServiceListItem from '../components/ServiceListItem'
 
 export default function AdminDashboard() {
   const { data: servicesList, loading, refetch } = useSupabaseTable('services', {
@@ -33,22 +34,6 @@ export default function AdminDashboard() {
       setName('')
       setDuration('')
       setPrice('')
-      refetch()
-    }
-  }
-
-  const handleDelete = async (id) => {
-    const confirmDelete = window.confirm("Are you sure you want to delete this service?")
-    if (!confirmDelete) return
-
-    const { error } = await supabase
-      .from('services')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      alert(`Error deleting: ${error.message}`)
-    } else {
       refetch()
     }
   }
@@ -93,7 +78,7 @@ export default function AdminDashboard() {
           )}
         </Card>
 
-        {/* Your Active Services list */}
+        {/* Your Active Services list — each item can now be edited in place */}
         <div>
           <h3>Active Services</h3>
           {loading ? (
@@ -103,17 +88,7 @@ export default function AdminDashboard() {
           ) : (
             <ul style={{ listStyleType: 'none', padding: 0 }}>
               {servicesList.map((service) => (
-                <li key={service.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong style={{ fontSize: '1.1em' }}>{service.name}</strong>
-                    <p style={{ margin: '5px 0 0 0', color: '#555' }}>
-                      {service.duration_minutes} minutes | ${Number(service.price).toFixed(2)}
-                    </p>
-                  </div>
-                  <Button variant="danger" onClick={() => handleDelete(service.id)}>
-                    Delete
-                  </Button>
-                </li>
+                <ServiceListItem key={service.id} service={service} onChanged={refetch} />
               ))}
             </ul>
           )}
