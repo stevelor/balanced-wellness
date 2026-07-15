@@ -1,32 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useSupabaseTable } from '../hooks/useSupabaseTable'
 import AvailabilityManager from '../components/AvailabilityManager'
 import AdminAppointments from '../components/AdminAppointments'
-import Navbar from '../components/Navbar' // The Navbar is imported here!
+import Navbar from '../components/Navbar'
+import Card from '../components/Card'
+import Button from '../components/Button'
 
 export default function AdminDashboard() {
+  const { data: servicesList, loading, refetch } = useSupabaseTable('services', {
+    orderBy: 'created_at',
+    ascending: false,
+  })
+
   const [name, setName] = useState('')
   const [duration, setDuration] = useState('')
   const [price, setPrice] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
-  const [servicesList, setServicesList] = useState([])
-
-  useEffect(() => {
-    fetchServices()
-  }, [])
-
-  const fetchServices = async () => {
-    const { data, error } = await supabase
-      .from('services')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching services:', error)
-    } else {
-      setServicesList(data)
-    }
-  }
 
   const handleAddService = async (e) => {
     e.preventDefault()
@@ -43,7 +33,7 @@ export default function AdminDashboard() {
       setName('')
       setDuration('')
       setPrice('')
-      fetchServices() 
+      refetch()
     }
   }
 
@@ -54,12 +44,12 @@ export default function AdminDashboard() {
     const { error } = await supabase
       .from('services')
       .delete()
-      .eq('id', id) 
+      .eq('id', id)
 
     if (error) {
       alert(`Error deleting: ${error.message}`)
     } else {
-      fetchServices()
+      refetch()
     }
   }
 
@@ -68,44 +58,48 @@ export default function AdminDashboard() {
       {/* The Navbar spans the top of the screen outside the main container */}
       <Navbar />
 
-      <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px' }}>
+      <div className="page-container-narrow">
         <h2>Admin Dashboard</h2>
         <hr style={{ marginBottom: '20px' }} />
 
         {/* Your imported management components */}
         <AdminAppointments />
         <AvailabilityManager />
-        
+
         {/* Your Services form */}
-        <div style={{ backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
+        <Card tone="default">
           <h3>Add a New Service</h3>
           <form onSubmit={handleAddService} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px' }}>Service Name: </label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+            <div className="form-group">
+              <label>Service Name: </label>
+              <input type="text" className="form-input" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px' }}>Duration (minutes): </label>
-              <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+            <div className="form-group">
+              <label>Duration (minutes): </label>
+              <input type="number" className="form-input" value={duration} onChange={(e) => setDuration(e.target.value)} required />
             </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px' }}>Price ($): </label>
-              <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+            <div className="form-group">
+              <label>Price ($): </label>
+              <input type="number" step="0.01" className="form-input" value={price} onChange={(e) => setPrice(e.target.value)} required />
             </div>
-            <button type="submit" style={{ padding: '10px', backgroundColor: '#28a745', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', borderRadius: '4px' }}>
+            <Button type="submit" variant="success">
               Save Service
-            </button>
+            </Button>
           </form>
           {statusMessage && (
-            <p style={{ marginTop: '15px', fontWeight: 'bold', color: statusMessage.includes('Error') ? 'red' : 'green' }}>{statusMessage}</p>
+            <p className={`status-message ${statusMessage.includes('Error') ? 'status-message-error' : 'status-message-success'}`}>
+              {statusMessage}
+            </p>
           )}
-        </div>
+        </Card>
 
         {/* Your Active Services list */}
         <div>
           <h3>Active Services</h3>
-          {servicesList.length === 0 ? (
-            <p>No services added yet.</p>
+          {loading ? (
+            <p className="loading-text">Loading services...</p>
+          ) : servicesList.length === 0 ? (
+            <p className="empty-text">No services added yet.</p>
           ) : (
             <ul style={{ listStyleType: 'none', padding: 0 }}>
               {servicesList.map((service) => (
@@ -113,15 +107,12 @@ export default function AdminDashboard() {
                   <div>
                     <strong style={{ fontSize: '1.1em' }}>{service.name}</strong>
                     <p style={{ margin: '5px 0 0 0', color: '#555' }}>
-                      {service.duration_minutes} minutes | ${service.price.toFixed(2)}
+                      {service.duration_minutes} minutes | ${Number(service.price).toFixed(2)}
                     </p>
                   </div>
-                  <button 
-                    onClick={() => handleDelete(service.id)} 
-                    style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                  >
+                  <Button variant="danger" onClick={() => handleDelete(service.id)}>
                     Delete
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

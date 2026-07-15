@@ -1,8 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useSupabaseTable } from '../hooks/useSupabaseTable'
+import Card from './Card'
+import Button from './Button'
 
 export default function AvailabilityManager() {
-  const [availabilityList, setAvailabilityList] = useState([])
+  const { data: availabilityList, loading, refetch } = useSupabaseTable('availability', {
+    orderBy: 'day_of_week',
+    ascending: true,
+  })
+
   const [dayOfWeek, setDayOfWeek] = useState('1') // Default to Monday
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('17:00')
@@ -11,20 +18,6 @@ export default function AvailabilityManager() {
   const daysMap = {
     0: 'Sunday', 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday',
     4: 'Thursday', 5: 'Friday', 6: 'Saturday'
-  }
-
-  useEffect(() => {
-    fetchAvailability()
-  }, [])
-
-  const fetchAvailability = async () => {
-    const { data, error } = await supabase
-      .from('availability')
-      .select('*')
-      .order('day_of_week', { ascending: true })
-
-    if (error) console.error('Error fetching availability:', error)
-    else setAvailabilityList(data)
   }
 
   const handleAddAvailability = async (e) => {
@@ -39,23 +32,23 @@ export default function AvailabilityManager() {
       setStatusMessage(`Error: ${error.message}`)
     } else {
       setStatusMessage('Hours saved successfully!')
-      fetchAvailability()
+      refetch()
     }
   }
 
   const handleDelete = async (id) => {
     const { error } = await supabase.from('availability').delete().eq('id', id)
     if (error) alert(`Error deleting: ${error.message}`)
-    else fetchAvailability()
+    else refetch()
   }
 
   return (
-    <div style={{ backgroundColor: '#e9ecef', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
+    <Card tone="muted">
       <h3>Set Weekly Working Hours</h3>
-      
+
       <form onSubmit={handleAddAvailability} style={{ display: 'flex', gap: '10px', alignItems: 'end', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div>
-          <label style={{ display: 'block', fontSize: '0.9em' }}>Day of Week:</label>
+        <div className="form-group">
+          <label>Day of Week:</label>
           <select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)} style={{ padding: '8px' }}>
             {Object.entries(daysMap).map(([num, name]) => (
               <option key={num} value={num}>{name}</option>
@@ -63,48 +56,53 @@ export default function AvailabilityManager() {
           </select>
         </div>
 
-        <div>
-          <label style={{ display: 'block', fontSize: '0.9em' }}>Start Time:</label>
+        <div className="form-group">
+          <label>Start Time:</label>
           <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} required style={{ padding: '8px' }} />
         </div>
 
-        <div>
-          <label style={{ display: 'block', fontSize: '0.9em' }}>End Time:</label>
+        <div className="form-group">
+          <label>End Time:</label>
           <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} required style={{ padding: '8px' }} />
         </div>
 
-        <button type="submit" style={{ padding: '9px 15px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+        <Button type="submit" variant="primary" style={{ backgroundColor: '#007bff' }}>
           Add Hours
-        </button>
+        </Button>
       </form>
 
-      {statusMessage && <p style={{ color: statusMessage.includes('Error') ? 'red' : 'green', fontSize: '0.9em' }}>{statusMessage}</p>}
+      {statusMessage && (
+        <p className={`status-message ${statusMessage.includes('Error') ? 'status-message-error' : 'status-message-success'}`}>
+          {statusMessage}
+        </p>
+      )}
 
-      {availabilityList.length > 0 && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white' }}>
+      {loading ? (
+        <p className="loading-text">Loading availability...</p>
+      ) : availabilityList.length > 0 && (
+        <table className="data-table">
           <thead>
-            <tr style={{ borderBottom: '2px solid #ccc' }}>
-              <th style={{ textAlign: 'left', padding: '10px' }}>Day</th>
-              <th style={{ textAlign: 'left', padding: '10px' }}>Hours</th>
-              <th style={{ textAlign: 'right', padding: '10px' }}>Action</th>
+            <tr>
+              <th>Day</th>
+              <th>Hours</th>
+              <th style={{ textAlign: 'right' }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {availabilityList.map(slot => (
-              <tr key={slot.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '10px', fontWeight: 'bold' }}>{daysMap[slot.day_of_week]}</td>
-                <td style={{ padding: '10px' }}>
-                  {/* Format the time slightly to look better */}
+              <tr key={slot.id}>
+                <td style={{ fontWeight: 'bold' }}>{daysMap[slot.day_of_week]}</td>
+                <td>
                   {slot.start_time.substring(0, 5)} - {slot.end_time.substring(0, 5)}
                 </td>
-                <td style={{ padding: '10px', textAlign: 'right' }}>
-                  <button onClick={() => handleDelete(slot.id)} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}>Remove</button>
+                <td style={{ textAlign: 'right' }}>
+                  <button className="btn-link-danger" onClick={() => handleDelete(slot.id)}>Remove</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-    </div>
+    </Card>
   )
 }

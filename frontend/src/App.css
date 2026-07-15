@@ -227,3 +227,180 @@
 .react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item--selected {
   background-color: #899E8B !important;
 }
+
+/* =========================================================
+   Shared app styles — added to replace repeated inline
+   style={{...}} blocks across pages/components. Change the
+   brand color or spacing once here instead of hunting
+   through every file.
+   ========================================================= */
+
+/* ===== Layout ===== */
+.page-container {
+  max-width: 700px;
+  margin: 40px auto;
+  padding: 20px;
+}
+
+.page-container-narrow {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 20px;
+}
+
+/* ===== Card ===== */
+.card {
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+}
+
+.card-default {
+  background-color: #f9f9f9;
+}
+
+.card-highlight {
+  background-color: #fff3cd;
+}
+
+.card-muted {
+  background-color: #e9ecef;
+}
+
+.card-soft {
+  background-color: #F4F1EA;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-family: 'Montserrat', sans-serif;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: #899E8B;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #758977;
+}
+
+.btn-success {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.btn-secondary {
+  background-color: #F4F1EA;
+  color: #555;
+  border: 1px solid #ddd;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #ece7db;
+}
+
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 0.9em;
+}
+
+.btn-link-danger {
+  background: none;
+  border: none;
+  color: red;
+  cursor: pointer;
+  padding: 0;
+  font-weight: normal;
+}
+
+/* ===== Status Badge ===== */
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+/* ===== Forms ===== */
+.form-group {
+  margin-bottom: 10px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.9em;
+}
+
+.form-input {
+  width: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* ===== Status Messages ===== */
+.status-message {
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.status-message-success {
+  color: #899E8B;
+}
+
+.status-message-error {
+  color: #D9534F;
+}
+
+/* ===== Tables ===== */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 2px solid #ccc;
+}
+
+.data-table td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+/* ===== Loading / Empty States ===== */
+.loading-text,
+.empty-text {
+  color: #666;
+  font-style: italic;
+}
