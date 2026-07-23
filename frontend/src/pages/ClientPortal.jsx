@@ -86,6 +86,7 @@ export default function ClientPortal() {
       .insert([
         {
           client_id: user.id,
+          client_email: user.email, // <-- THIS IS THE FIX! It now saves to the database.
           service_id: selectedService,
           appointment_date: formattedDate,
           start_time: formattedTime,
