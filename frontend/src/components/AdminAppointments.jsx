@@ -11,8 +11,7 @@ export default function AdminAppointments() {
       appointment_date,
       start_time,
       status,
-      client_email,
-      client_name, 
+      client_email, 
       services (name)
     `,
     orderBy: 'appointment_date',
