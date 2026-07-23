@@ -39,7 +39,7 @@ export default function AdminAppointments() {
         body: {
           // These keys now perfectly match what the Edge Function expects!
           clientEmail: appointment.client_email,
-          clientName: appointment.client_name, 
+          clientName: 'there', 
           serviceName: appointment.services?.name ?? 'Unknown service',
           date: appointment.appointment_date,
           time: appointment.start_time,
