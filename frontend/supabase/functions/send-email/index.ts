@@ -10,18 +10,41 @@ serve(async (req) => {
   }
 
   try {
-    // We added "status" to the incoming data (defaults to 'pending' if not provided)
     const { clientEmail, clientName, serviceName, date, time, status = 'pending' } = await req.json()
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-    const ADMIN_EMAIL = Deno.env.get('ADMIN_EMAIL')
+    
+    // This grabs your admin email(s) from Supabase secrets
+    const ADMIN_EMAIL = Deno.env.get('ADMIN_EMAIL') 
 
-    let subject = ''
-    let htmlBody = ''
+    // Helper function to make sending multiple emails cleaner
+    const sendEmail = async (toAddresses, subject, htmlBody) => {
+      // If there are multiple emails separated by commas, Resend needs them as an array
+      const toArray = typeof toAddresses === 'string' && toAddresses.includes(',') 
+        ? toAddresses.split(',').map(email => email.trim()) 
+        : toAddresses;
 
-    // 1. IF THE APPOINTMENT IS CONFIRMED
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${RESEND_API_KEY}`
+        },
+        body: JSON.stringify({
+          from: 'Balanced Wellness <appointments@donnabooking.com>',
+          to: toArray,
+          subject: subject,
+          html: htmlBody
+        })
+      })
+      return await res.json()
+    }
+
+    let responseData;
+
+    // 1. IF THE APPOINTMENT IS CONFIRMED (Admin clicked Confirm)
     if (status === 'confirmed') {
-      subject = `Confirmed: Healing Session on ${date}`
-      htmlBody = `
+      const subject = `Confirmed: Healing Session on ${date}`
+      const htmlBody = `
         <div style="font-family: sans-serif; color: #333;">
           <h2>Your Session is Confirmed!</h2>
           <p>Hi ${clientName || 'there'},</p>
@@ -32,11 +55,13 @@ serve(async (req) => {
           <p>Warmly,<br/>Donna</p>
         </div>
       `
+      responseData = await sendEmail(clientEmail, subject, htmlBody)
     } 
-    // 2. IF THE APPOINTMENT IS CANCELLED
+    
+    // 2. IF THE APPOINTMENT IS CANCELLED (Admin clicked Cancel)
     else if (status === 'cancelled') {
-      subject = `Update: Healing Session on ${date}`
-      htmlBody = `
+      const subject = `Update: Healing Session on ${date}`
+      const htmlBody = `
         <div style="font-family: sans-serif; color: #333;">
           <h2>Session Update</h2>
           <p>Hi ${clientName || 'there'},</p>
@@ -45,11 +70,14 @@ serve(async (req) => {
           <p>Warmly,<br/>Donna</p>
         </div>
       `
+      responseData = await sendEmail(clientEmail, subject, htmlBody)
     } 
-    // 3. THE INITIAL BOOKING REQUEST (PENDING)
+    
+    // 3. THE INITIAL BOOKING REQUEST (Client just booked on the website)
     else {
-      subject = `Healing Session Request Received: ${serviceName}`
-      htmlBody = `
+      // Email A: The receipt for the client
+      const clientSubject = `Healing Session Request Received: ${serviceName}`
+      const clientHtmlBody = `
         <div style="font-family: sans-serif; color: #333;">
           <h2>Session Request Received</h2>
           <p>Hi ${clientName || 'there'},</p>
@@ -60,26 +88,34 @@ serve(async (req) => {
           <p>Warmly,<br/>Donna</p>
         </div>
       `
+      
+      // Email B: The alert for you and Donna!
+      const adminSubject = `🔔 New Booking Request from ${clientName || 'a client'}`
+      const adminHtmlBody = `
+        <div style="font-family: sans-serif; color: #333;">
+          <h2 style="color: #2c3e50;">New Appointment Request</h2>
+          <p>A new client has requested a session on the website.</p>
+          <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #899E8B; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Client Name:</strong> ${clientName || 'N/A'}</p>
+            <p style="margin: 5px 0;"><strong>Client Email:</strong> ${clientEmail}</p>
+            <p style="margin: 5px 0;"><strong>Service:</strong> ${serviceName}</p>
+            <p style="margin: 5px 0;"><strong>Requested Date:</strong> ${date}</p>
+            <p style="margin: 5px 0;"><strong>Requested Time:</strong> ${time}</p>
+          </div>
+          <p>Please log in to the admin dashboard at <a href="https://donnabooking.com">donnabooking.com</a> to confirm or cancel this request.</p>
+        </div>
+      `
+
+      // Fire both emails off simultaneously
+      const [clientRes, adminRes] = await Promise.all([
+        sendEmail(clientEmail, clientSubject, clientHtmlBody),
+        sendEmail(ADMIN_EMAIL, adminSubject, adminHtmlBody) 
+      ])
+      
+      responseData = { clientRes, adminRes }
     }
 
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_API_KEY}`
-      },
-      body: JSON.stringify({
-        from: 'Balanced Wellness <appointments@donnabooking.com>',
-        to: clientEmail,
-        bcc: ADMIN_EMAIL, 
-        subject: subject,
-        html: htmlBody
-      })
-    })
-
-    const data = await res.json()
-
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(responseData), {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       status: 200,
     })
