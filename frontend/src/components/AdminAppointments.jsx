@@ -12,6 +12,7 @@ export default function AdminAppointments() {
       start_time,
       status,
       client_email,
+      client_name, 
       services (name)
     `,
     orderBy: 'appointment_date',
@@ -37,11 +38,12 @@ export default function AdminAppointments() {
     if (appointment) {
       supabase.functions.invoke('send-email', {
         body: {
-          type: 'status_update',
-          serviceName: appointment.services?.name ?? 'Unknown service',
-          appointmentDate: appointment.appointment_date,
-          startTime: appointment.start_time,
+          // These keys now perfectly match what the Edge Function expects!
           clientEmail: appointment.client_email,
+          clientName: appointment.client_name, 
+          serviceName: appointment.services?.name ?? 'Unknown service',
+          date: appointment.appointment_date,
+          time: appointment.start_time,
           status: newStatus,
         },
       }).catch(err => console.error('Email notification failed:', err))
