@@ -22,7 +22,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   if (loading) return <div className="loading-text" style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>;
 
   if (!session) {
-    return <Navigate to="/" replace />;
+    return <Navigate string="/" replace />;
   }
 
   const userRole = session.user.app_metadata.role;
