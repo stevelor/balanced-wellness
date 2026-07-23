@@ -21,7 +21,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`
       },
       body: JSON.stringify({
-        from: 'Balanced Wellness <appointments@healwithdonna.com>', // The domain you just verified!
+        from: 'Balanced Wellness <appointments@donnabooking.com>', // The domain you just verified!
         to: clientEmail,
         bcc: ADMIN_EMAIL, // This sends the hidden copy to your mom
         subject: `Healing Session Request: ${serviceName}`,
