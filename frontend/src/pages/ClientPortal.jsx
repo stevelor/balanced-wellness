@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 export default function ClientPortal() {
   const [services, setServices] = useState([])
   const [availability, setAvailability] = useState([]) 
-  const [blockedDates, setBlockedDates] = useState([]) // Stores blocked dates array
+  const [blockedDates, setBlockedDates] = useState([]) 
   const [selectedService, setSelectedService] = useState('')
   const [date, setDate] = useState(null) 
   const [time, setTime] = useState(null) 
@@ -36,7 +36,6 @@ export default function ClientPortal() {
   const fetchBlockedDates = async () => {
     const { data, error } = await supabase.from('blocked_dates').select('date')
     if (!error && data) {
-      // Convert date strings ('YYYY-MM-DD') into JavaScript Date objects for DatePicker
       const dateObjects = data.map(item => {
         const [year, month, day] = item.date.split('-').map(Number)
         return new Date(year, month - 1, day)
@@ -210,8 +209,30 @@ export default function ClientPortal() {
       <Navbar />
       
       <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px' }}>
-        <h2>Schedule Your Healing Session</h2>
-        <hr style={{ marginBottom: '20px', border: 'none', borderBottom: '1px solid #ddd' }} />
+        
+        {/* --- NEW: Welcoming Hero Banner Header --- */}
+        <div style={{ 
+          backgroundColor: '#F4F1EA', 
+          padding: '30px 20px', 
+          borderRadius: '12px', 
+          textAlign: 'center', 
+          marginBottom: '30px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+        }}>
+          <svg 
+            width="36" height="36" viewBox="0 0 24 24" 
+            fill="none" stroke="#899E8B" strokeWidth="1.5" 
+            strokeLinecap="round" strokeLinejoin="round" 
+            style={{ marginBottom: '10px' }}
+          >
+            <path d="M12 2a10 10 0 0 1 7.54 16.6l-1.08-1.08A8 8 0 1 0 12 20v2a10 10 0 0 1 0-20z"></path>
+            <path d="M12 6v6l4 2"></path>
+          </svg>
+          <h2 style={{ color: '#2c3e50', margin: '0 0 8px 0', fontSize: '1.6rem', fontWeight: '500' }}>Welcome to Your Sanctuary</h2>
+          <p style={{ color: '#666', margin: 0, fontSize: '1.05rem', fontStyle: 'italic' }}>
+            "Take a deep breath and carve out some time for your well-being."
+          </p>
+        </div>
 
         <div style={{ backgroundColor: '#F4F1EA', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
           <h3>Book Your Session</h3>
@@ -250,7 +271,7 @@ export default function ClientPortal() {
                 selected={date} 
                 onChange={(d) => { setDate(d); setTime(null); }} 
                 minDate={new Date()} 
-                excludeDates={blockedDates} // <-- Greys out blocked days on the calendar!
+                excludeDates={blockedDates} 
                 placeholderText="Select your date"
                 dateFormat="MMMM d, yyyy"
                 required
@@ -263,7 +284,7 @@ export default function ClientPortal() {
               <div>
                 <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#2c3e50' }}>Choose an Available Time Slot:</label>
                 {timeSlots.length === 0 ? (
-                  <p style={{ color: '#D9534F', fontSize: '0.95rem', margin: 0 }}>We are closed on this day of the week. Please choose another date.</p>
+                  <p style={{ color: '#D9534F', fontSize: '0.95rem', margin: 0 }}>We are closed on this day of the week or this date is blocked. Please choose another date.</p>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
                     {timeSlots.map(slot => (
