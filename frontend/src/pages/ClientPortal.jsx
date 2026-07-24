@@ -13,7 +13,7 @@ export default function ClientPortal() {
   const [time, setTime] = useState(null) 
   const [myAppointments, setMyAppointments] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [cancellingId, setCancellingId] = useState(null) // Tracks loading state for cancellations
+  const [cancellingId, setCancellingId] = useState(null)
 
   useEffect(() => {
     fetchServices()
@@ -36,7 +36,7 @@ export default function ClientPortal() {
     if (user) {
       const { data, error } = await supabase
         .from('appointments')
-        .select(`id, appointment_date, start_time, status, services (name)`)
+        .select(`id, appointment_date, start_time, status, client_email, services (name)`)
         .eq('client_id', user.id)
         .order('appointment_date', { ascending: true })
 
@@ -44,7 +44,6 @@ export default function ClientPortal() {
     }
   }
 
-  // Helper to generate 30-minute time slots based on availability for the selected day
   const getAvailableTimeSlots = () => {
     if (!date || availability.length === 0) return []
     const dayOfWeek = date.getDay()
@@ -78,6 +77,13 @@ export default function ClientPortal() {
     const ampm = hour >= 12 ? 'PM' : 'AM'
     hour = hour % 12 || 12
     return `${hour}:${minuteStr} ${ampm}`
+  }
+
+  const canCancel = (appointmentDate, startTime) => {
+    const aptDateTime = new Date(`${appointmentDate}T${startTime}`)
+    const now = new Date()
+    const hoursLeft = (aptDateTime - now) / (1000 * 60 * 60)
+    return hoursLeft >= 24
   }
 
   const handleBooking = async (e) => {
@@ -139,20 +145,43 @@ export default function ClientPortal() {
     setIsSubmitting(false)
   }
 
-  // --- NEW: Client-side cancellation function ---
-  const handleCancelAppointment = async (id) => {
-    setCancellingId(id)
+  const handleCancelAppointment = async (apt) => {
+    if (!canCancel(apt.appointment_date, apt.start_time)) {
+      toast.error("Appointments cannot be cancelled within 24 hours of the start time.")
+      return
+    }
+
+    setCancellingId(apt.id)
     const { error } = await supabase
       .from('appointments')
       .update({ status: 'cancelled' })
-      .eq('id', id)
+      .eq('id', apt.id)
 
     if (error) {
-      toast.error(`Error cancelling request: ${error.message}`)
-    } else {
-      toast.success('Appointment request successfully cancelled.')
-      fetchMyAppointments()
+      toast.error(`Error cancelling appointment: ${error.message}`)
+      setCancellingId(null)
+      return
     }
+
+    toast.success('Appointment successfully cancelled.')
+    fetchMyAppointments()
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.functions.invoke('send-email', {
+        body: {
+          clientEmail: user.email,
+          clientName: user.user_metadata?.full_name || 'there',
+          serviceName: apt.services?.name ?? 'Healing Session',
+          date: apt.appointment_date,
+          time: apt.start_time,
+          status: 'cancelled',
+        },
+      })
+    } catch (emailErr) {
+      console.error('Cancellation email failed:', emailErr)
+    }
+
     setCancellingId(null)
   }
 
@@ -266,46 +295,53 @@ export default function ClientPortal() {
           </form>
         </div>
 
-        {/* Upcoming Sessions List with Self-Cancellation */}
         <div>
           <h3>Your Upcoming Sessions</h3>
           {myAppointments.length === 0 ? (
             <p style={{ color: '#666' }}>You have no upcoming sessions at this time.</p>
           ) : (
             <ul style={{ listStyleType: 'none', padding: 0 }}>
-              {myAppointments.map((apt) => (
-                <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                  <div>
-                    <strong style={{ fontSize: '1.1em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
-                    <span style={{ color: '#666', display: 'block', margin: '5px 0' }}>Date: {apt.appointment_date} at {formatDisplayTime(apt.start_time)}</span>
-                    <span style={{ display: 'inline-block', marginTop: '5px', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', fontWeight: '500', backgroundColor: apt.status === 'pending' ? '#FDE68A' : apt.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2', color: apt.status === 'pending' ? '#92400E' : apt.status === 'confirmed' ? '#065F46' : '#991B1B' }}>
-                      {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
-                    </span>
-                  </div>
+              {myAppointments.map((apt) => {
+                const isWithin24Hours = !canCancel(apt.appointment_date, apt.start_time)
+                return (
+                  <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <strong style={{ fontSize: '1.1em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
+                      <span style={{ color: '#666', display: 'block', margin: '5px 0' }}>Date: {apt.appointment_date} at {formatDisplayTime(apt.start_time)}</span>
+                      <span style={{ display: 'inline-block', marginTop: '5px', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', fontWeight: '500', backgroundColor: apt.status === 'pending' ? '#FDE68A' : apt.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2', color: apt.status === 'pending' ? '#92400E' : apt.status === 'confirmed' ? '#065F46' : '#991B1B' }}>
+                        {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
+                      </span>
+                    </div>
 
-                  {/* Allows clients to cancel their own pending requests */}
-                  {apt.status === 'pending' && (
-                    <button
-                      type="button"
-                      disabled={cancellingId === apt.id}
-                      onClick={() => handleCancelAppointment(apt.id)}
-                      style={{
-                        padding: '6px 12px',
-                        backgroundColor: '#fff',
-                        color: '#D9534F',
-                        border: '1px solid #D9534F',
-                        borderRadius: '6px',
-                        cursor: cancellingId === apt.id ? 'not-allowed' : 'pointer',
-                        fontSize: '0.85rem',
-                        fontWeight: '500',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      {cancellingId === apt.id ? 'Cancelling...' : 'Cancel Request'}
-                    </button>
-                  )}
-                </li>
-              ))}
+                    {(apt.status === 'pending' || apt.status === 'confirmed') && (
+                      isWithin24Hours ? (
+                        <span style={{ fontSize: '0.85rem', color: '#888', fontStyle: 'italic' }}>
+                          Cannot cancel within 24h
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={cancellingId === apt.id}
+                          onClick={() => handleCancelAppointment(apt)}
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#fff',
+                            color: '#D9534F',
+                            border: '1px solid #D9534F',
+                            borderRadius: '6px',
+                            cursor: cancellingId === apt.id ? 'not-allowed' : 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: '500',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          {cancellingId === apt.id ? 'Cancelling...' : 'Cancel Appointment'}
+                        </button>
+                      )
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
