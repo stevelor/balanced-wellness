@@ -8,6 +8,7 @@ import Card from '../components/Card'
 import Button from '../components/Button'
 import ServiceListItem from '../components/ServiceListItem'
 import BlockedDatesManager from '../components/BlockedDatesManager'
+import AdminVitals from '../components/AdminVitals'
 
 export default function AdminDashboard() {
   const { data: servicesList, loading, refetch } = useSupabaseTable('services', {
@@ -52,6 +53,7 @@ export default function AdminDashboard() {
         <AdminAppointments />
         <AvailabilityManager />
         <BlockedDatesManager/>
+        <AdminVitals/>
 
         {/* Your Services form */}
         <Card tone="default">
