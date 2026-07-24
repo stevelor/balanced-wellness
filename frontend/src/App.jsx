@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import './App.css';
+import { Toaster } from 'react-hot-toast'; // <-- 1. Added the import here
+
 import Auth from './pages/Auth';
 import ClientPortal from './pages/ClientPortal';
 import AdminDashboard from './pages/AdminDashboard';
 import Button from './components/Button';
 import UpdatePassword from './pages/UpdatePassword';
+
 
 // Protected Route Component to handle access logic
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -61,6 +64,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 function App() {
   return (
     <BrowserRouter>
+      {/* 2. Added the Toaster right here so it sits on top of all pages! */}
+      <Toaster position="top-center" />
+      
       <Routes>
         <Route path="/" element={<Auth />} />
         <Route path="/portal" element={<ClientPortal />} />

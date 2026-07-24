@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import Navbar from '../components/Navbar'
 import DatePicker from "react-datepicker"
 import "react-datepicker/dist/react-datepicker.css"
+import toast from 'react-hot-toast' // <-- NEW IMPORT
 
 export default function ClientPortal() {
   const [services, setServices] = useState([])
@@ -10,8 +11,10 @@ export default function ClientPortal() {
   const [selectedService, setSelectedService] = useState('')
   const [date, setDate] = useState(null) 
   const [time, setTime] = useState(null) 
-  const [statusMessage, setStatusMessage] = useState('')
   const [myAppointments, setMyAppointments] = useState([])
+  
+  // NEW: State to handle the button loading animation
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     fetchServices()
@@ -45,16 +48,17 @@ export default function ClientPortal() {
   const handleBooking = async (e) => {
     e.preventDefault()
     
+    // UI VALIDATION (with toasts!)
     if (!selectedService) {
-      setStatusMessage("Please select a healing service for your session.")
+      toast.error("Please select a healing service for your session.")
       return
     }
     if (!date || !time) {
-      setStatusMessage("Please select both a valid date and time.")
+      toast.error("Please select both a valid date and time.")
       return
     }
 
-    setStatusMessage('Checking schedule...')
+    setIsSubmitting(true) // Disable the button and show loading state
     
     const formattedDate = date.toLocaleDateString('en-CA') 
     const formattedTime = time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -63,7 +67,8 @@ export default function ClientPortal() {
     const dayRules = availability.filter(a => a.day_of_week === dayOfWeek)
     
     if (dayRules.length === 0) {
-      setStatusMessage("We are currently closed on this day of the week. Please select another day.")
+      toast.error("We are closed on this day of the week. Please select another day.")
+      setIsSubmitting(false)
       return 
     }
 
@@ -74,19 +79,20 @@ export default function ClientPortal() {
     })
 
     if (!isValidTime) {
-      setStatusMessage("The selected time falls outside of our available hours. Please choose a different time.")
+      toast.error("The selected time falls outside of our available hours.")
+      setIsSubmitting(false)
       return 
     }
 
-    setStatusMessage('Reserving your time...')
     const { data: { user } } = await supabase.auth.getUser()
 
+    // 1. SAVE TO DATABASE
     const { error } = await supabase
       .from('appointments')
       .insert([
         {
           client_id: user.id,
-          client_email: user.email, // <-- THIS IS THE FIX! It now saves to the database.
+          client_email: user.email, 
           service_id: selectedService,
           appointment_date: formattedDate,
           start_time: formattedTime,
@@ -95,33 +101,37 @@ export default function ClientPortal() {
       ])
 
     if (error) {
-      setStatusMessage(`Error: ${error.message}`)
-    } else {
-      setStatusMessage('Your session has been successfully requested! Sending confirmation...')
-      
-      // TRIGGER THE SUPABASE EDGE FUNCTION TO SEND THE EMAILS
-      try {
-        await supabase.functions.invoke('send-email', {
-          body: { 
-            clientEmail: user.email, 
-            clientName: user.user_metadata?.full_name || 'Client',
-            serviceName: services.find(s => s.id === selectedService)?.name,
-            date: formattedDate,
-            time: formattedTime
-          }
-        })
-        setStatusMessage('Your session has been successfully requested and a confirmation email has been sent!')
-      } catch (emailError) {
-        console.error("Email failed to send:", emailError)
-        // We still tell them it was booked, even if the email notification failed
-        setStatusMessage('Your session has been requested, but there was an issue sending the confirmation email.')
-      }
+      toast.error(`Database Error: ${error.message}`)
+      setIsSubmitting(false)
+      return
+    } 
 
-      setSelectedService('')
-      setDate(null)
-      setTime(null)
-      fetchMyAppointments() 
+    // 2. TRIGGER THE EMAIL NOTIFICATION
+    try {
+      await supabase.functions.invoke('send-email', {
+        body: { 
+          clientEmail: user.email, 
+          clientName: user.user_metadata?.full_name || 'Client',
+          serviceName: services.find(s => s.id === selectedService)?.name,
+          date: formattedDate,
+          time: formattedTime
+        }
+      })
+      
+      // If everything works, show the beautiful success toast
+      toast.success('Your session has been successfully requested!')
+      
+    } catch (emailError) {
+      console.error("Email failed to send:", emailError)
+      toast.success('Session requested, but there was an issue sending the email receipt.')
     }
+
+    // 3. RESET THE FORM
+    setSelectedService('')
+    setDate(null)
+    setTime(null)
+    fetchMyAppointments() 
+    setIsSubmitting(false) // Re-enable the button
   }
 
   return (
@@ -164,7 +174,9 @@ export default function ClientPortal() {
                       backgroundColor: selectedService === service.id ? '#e9efe9' : '#fff',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
-                      boxShadow: selectedService === service.id ? '0 4px 8px rgba(0,0,0,0.05)' : 'none'
+                      boxShadow: selectedService === service.id ? '0 4px 8px rgba(0,0,0,0.05)' : 'none',
+                      opacity: isSubmitting ? 0.6 : 1, // Dims while submitting
+                      pointerEvents: isSubmitting ? 'none' : 'auto' // Prevents clicking while submitting
                     }}
                   >
                     <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50', fontSize: '1.1em' }}>{service.name}</h4>
@@ -185,6 +197,7 @@ export default function ClientPortal() {
                   placeholderText="Select your date"
                   dateFormat="MMMM d, yyyy"
                   required
+                  disabled={isSubmitting} // Locks the calendar while loading
                 />
               </div>
               <div style={{ flex: '1 1 200px' }}>
@@ -199,16 +212,31 @@ export default function ClientPortal() {
                   dateFormat="h:mm aa"
                   placeholderText="Select your time"
                   required
+                  disabled={isSubmitting} // Locks the time picker while loading
                 />
               </div>
             </div>
             
-            <button type="submit" style={{ padding: '14px', backgroundColor: '#899E8B', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.05rem', transition: 'background-color 0.3s ease', marginTop: '10px', boxShadow: '0 4px 6px rgba(137, 158, 139, 0.2)' }}>
-              Reserve My Time
+            <button 
+              type="submit" 
+              disabled={isSubmitting} // Prevents double clicking
+              style={{ 
+                padding: '14px', 
+                backgroundColor: isSubmitting ? '#aebfad' : '#899E8B', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '8px', 
+                cursor: isSubmitting ? 'not-allowed' : 'pointer', 
+                fontWeight: 'bold', 
+                fontSize: '1.05rem', 
+                transition: 'background-color 0.3s ease', 
+                marginTop: '10px', 
+                boxShadow: '0 4px 6px rgba(137, 158, 139, 0.2)' 
+              }}
+            >
+              {isSubmitting ? 'Reserving...' : 'Reserve My Time'}
             </button>
           </form>
-          
-          {statusMessage && <p style={{ marginTop: '15px', fontWeight: 'bold', color: statusMessage.includes('Error') || statusMessage.includes('closed') || statusMessage.includes('outside') || statusMessage.includes('Please select') || statusMessage.includes('issue') ? '#D9534F' : '#899E8B' }}>{statusMessage}</p>}
         </div>
 
         <div>
