@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient'; // Points to src/supabaseClient
+import { supabase } from '../supabaseClient'; 
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -9,21 +9,17 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
-  
-  // 1. Added the state to track if the password should be visible
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    // Check if they already have a valid session right now
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate('/portal'); // Redirects to your portal route
+        navigate('/portal'); 
       } else {
         setIsVerifying(false);
       }
     });
 
-    // Listen for auth updates (like clicking the email link)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         navigate('/portal');
@@ -48,6 +44,27 @@ export default function Auth() {
     setLoading(false);
   };
 
+  // NEW: The forgot password function
+  const handleForgotPassword = async () => {
+    if (!email) {
+      alert("Please type your email into the email box first!");
+      return;
+    }
+    
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // This dynamically grabs your website URL (localhost for testing, donnabooking.com for live)
+      redirectTo: `${window.location.origin}/update-password`,
+    });
+    
+    if (error) {
+      alert(`Error: ${error.message}`);
+    } else {
+      alert("Password reset link sent! Please check your email.");
+    }
+    setLoading(false);
+  };
+
   if (isVerifying) {
     return <div style={{ textAlign: 'center', marginTop: '50px', fontFamily: 'sans-serif' }}>Verifying your account...</div>;
   }
@@ -67,7 +84,6 @@ export default function Auth() {
           />
         </div>
         
-        {/* 2. Updated the password input to include the toggle button */}
         <div>
           <label style={{ display: 'block', marginBottom: '5px' }}>Password: </label>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -75,29 +91,26 @@ export default function Auth() {
               type={showPassword ? "text" : "password"} 
               value={password} 
               onChange={(e) => setPassword(e.target.value)} 
-              required 
+              required={!isSignUp ? false : true} // Make it not strictly required if they are just resetting
               style={{ width: '100%', padding: '8px', paddingRight: '40px', boxSizing: 'border-box' }}
             />
             <button 
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              style={{ 
-                position: 'absolute', 
-                right: '10px', 
-                background: 'none', 
-                border: 'none', 
-                cursor: 'pointer',
-                fontSize: '1.2rem',
-                padding: '0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-              title={showPassword ? "Hide password" : "Show password"}
+              style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               {showPassword ? "🙈" : "👁️"} 
             </button>
           </div>
+          
+          {/* NEW: Forgot password link (only shows on the Login screen) */}
+          {!isSignUp && (
+            <div style={{ textAlign: 'right', marginTop: '8px' }}>
+              <button type="button" onClick={handleForgotPassword} style={{ background: 'none', border: 'none', color: '#0066cc', cursor: 'pointer', fontSize: '0.9em', padding: 0 }}>
+                Forgot Password?
+              </button>
+            </div>
+          )}
         </div>
 
         <button type="submit" disabled={loading} style={{ padding: '10px', cursor: 'pointer', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>

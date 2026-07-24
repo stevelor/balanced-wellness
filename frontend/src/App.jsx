@@ -6,6 +6,7 @@ import Auth from './pages/Auth';
 import ClientPortal from './pages/ClientPortal';
 import AdminDashboard from './pages/AdminDashboard';
 import Button from './components/Button';
+import UpdatePassword from './pages/UpdatePassword';
 
 // Protected Route Component to handle access logic
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -73,6 +74,7 @@ function App() {
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/update-password" element={<UpdatePassword />} />
       </Routes>
     </BrowserRouter>
   );
