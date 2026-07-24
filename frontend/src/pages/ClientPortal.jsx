@@ -146,7 +146,7 @@ export default function ClientPortal() {
           clientName: user.user_metadata?.full_name || 'Client',
           serviceName: services.find(s => s.id === selectedService)?.name,
           date: formattedDate,
-          time: time
+          time: formatDisplayTime(time) // <-- 12-Hour format applied here!
         }
       })
       toast.success('Your session has been successfully requested!')
@@ -191,7 +191,7 @@ export default function ClientPortal() {
           clientName: user.user_metadata?.full_name || 'there',
           serviceName: apt.services?.name ?? 'Healing Session',
           date: apt.appointment_date,
-          time: apt.start_time,
+          time: formatDisplayTime(apt.start_time), // <-- 12-Hour format applied here!
           status: 'cancelled',
         },
       })
@@ -210,7 +210,6 @@ export default function ClientPortal() {
       
       <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px' }}>
         
-        {/* --- NEW: Welcoming Hero Banner Header --- */}
         <div style={{ 
           backgroundColor: '#F4F1EA', 
           padding: '30px 20px', 

@@ -4,7 +4,7 @@ import { useSupabaseTable } from '../hooks/useSupabaseTable'
 import Card from './Card'
 import Button from './Button'
 import StatusBadge from './StatusBadge'
-import toast from 'react-hot-toast' // <-- New Toast import
+import toast from 'react-hot-toast' 
 
 export default function AdminAppointments() {
   const { data: appointments, loading, refetch } = useSupabaseTable('appointments', {
@@ -20,11 +20,20 @@ export default function AdminAppointments() {
     ascending: true,
   })
 
-  // NEW: Tracks which specific appointment row is currently saving
   const [processingId, setProcessingId] = useState(null)
 
+  // --- NEW: Helper to format 24h time to 12h AM/PM ---
+  const formatTime = (timeString) => {
+    if (!timeString) return ''
+    const [hourStr, minuteStr] = timeString.split(':')
+    let hour = parseInt(hourStr, 10)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    hour = hour % 12 || 12
+    return `${hour}:${minuteStr} ${ampm}`
+  }
+
   const updateStatus = async (id, newStatus) => {
-    setProcessingId(id) // Disables the buttons for this specific row
+    setProcessingId(id) 
     const appointment = appointments.find(a => a.id === id)
 
     const { error } = await supabase
@@ -48,7 +57,7 @@ export default function AdminAppointments() {
           clientName: 'there', 
           serviceName: appointment.services?.name ?? 'Unknown service',
           date: appointment.appointment_date,
-          time: appointment.start_time,
+          time: formatTime(appointment.start_time), // <-- 12-Hour format applied here!
           status: newStatus,
         },
       }).catch(err => console.error('Email notification failed:', err))
@@ -65,7 +74,6 @@ export default function AdminAppointments() {
         <p className="loading-text">Loading appointments...</p>
       ) : appointments.length === 0 ? (
         
-        // --- NEW: Beautiful Empty State Illustration ---
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#6b7280' }}>
           <svg 
             width="64" height="64" viewBox="0 0 24 24" 
@@ -98,7 +106,7 @@ export default function AdminAppointments() {
               <tr key={apt.id}>
                 <td style={{ fontWeight: 'bold' }}>{apt.services?.name}</td>
                 <td>
-                  {apt.appointment_date} @ {apt.start_time.substring(0, 5)}
+                  {apt.appointment_date} @ {formatTime(apt.start_time)} {/* <-- 12-Hour format applied here! */}
                 </td>
                 <td style={{ textAlign: 'center' }}>
                   <StatusBadge status={apt.status} />
