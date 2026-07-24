@@ -10,9 +10,10 @@ export default function ClientPortal() {
   const [availability, setAvailability] = useState([]) 
   const [selectedService, setSelectedService] = useState('')
   const [date, setDate] = useState(null) 
-  const [time, setTime] = useState(null) // Stores selected time string like '09:00'
+  const [time, setTime] = useState(null) 
   const [myAppointments, setMyAppointments] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [cancellingId, setCancellingId] = useState(null) // Tracks loading state for cancellations
 
   useEffect(() => {
     fetchServices()
@@ -71,7 +72,6 @@ export default function ClientPortal() {
     return slots
   }
 
-  // Formats '09:30' into a clean 12-hour display like '9:30 AM'
   const formatDisplayTime = (timeString) => {
     const [hourStr, minuteStr] = timeString.split(':')
     let hour = parseInt(hourStr, 10)
@@ -97,7 +97,6 @@ export default function ClientPortal() {
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    // 1. SAVE TO DATABASE
     const { error } = await supabase
       .from('appointments')
       .insert([
@@ -117,7 +116,6 @@ export default function ClientPortal() {
       return
     } 
 
-    // 2. TRIGGER THE EMAIL NOTIFICATION
     try {
       await supabase.functions.invoke('send-email', {
         body: { 
@@ -141,6 +139,23 @@ export default function ClientPortal() {
     setIsSubmitting(false)
   }
 
+  // --- NEW: Client-side cancellation function ---
+  const handleCancelAppointment = async (id) => {
+    setCancellingId(id)
+    const { error } = await supabase
+      .from('appointments')
+      .update({ status: 'cancelled' })
+      .eq('id', id)
+
+    if (error) {
+      toast.error(`Error cancelling request: ${error.message}`)
+    } else {
+      toast.success('Appointment request successfully cancelled.')
+      fetchMyAppointments()
+    }
+    setCancellingId(null)
+  }
+
   const timeSlots = getAvailableTimeSlots()
 
   return (
@@ -156,7 +171,6 @@ export default function ClientPortal() {
 
           <form onSubmit={handleBooking} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
-            {/* Service Selection */}
             <div>
               <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500' }}>How can we help you heal today?</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
@@ -183,7 +197,6 @@ export default function ClientPortal() {
               </div>
             </div>
 
-            {/* Date Selection */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label style={{ fontWeight: '600', color: '#2c3e50' }}>Choose a Date:</label>
               <DatePicker 
@@ -198,7 +211,6 @@ export default function ClientPortal() {
               />
             </div>
 
-            {/* Smart Clickable Time Chips */}
             {date && (
               <div>
                 <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#2c3e50' }}>Choose an Available Time Slot:</label>
@@ -254,7 +266,7 @@ export default function ClientPortal() {
           </form>
         </div>
 
-        {/* Upcoming Sessions List */}
+        {/* Upcoming Sessions List with Self-Cancellation */}
         <div>
           <h3>Your Upcoming Sessions</h3>
           {myAppointments.length === 0 ? (
@@ -262,12 +274,36 @@ export default function ClientPortal() {
           ) : (
             <ul style={{ listStyleType: 'none', padding: 0 }}>
               {myAppointments.map((apt) => (
-                <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                  <strong style={{ fontSize: '1.1em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
-                  <span style={{ color: '#666', display: 'block', margin: '5px 0' }}>Date: {apt.appointment_date} at {formatDisplayTime(apt.start_time)}</span>
-                  <span style={{ display: 'inline-block', marginTop: '5px', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', fontWeight: '500', backgroundColor: apt.status === 'pending' ? '#FDE68A' : apt.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2', color: apt.status === 'pending' ? '#92400E' : apt.status === 'confirmed' ? '#065F46' : '#991B1B' }}>
-                    {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
-                  </span>
+                <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <strong style={{ fontSize: '1.1em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
+                    <span style={{ color: '#666', display: 'block', margin: '5px 0' }}>Date: {apt.appointment_date} at {formatDisplayTime(apt.start_time)}</span>
+                    <span style={{ display: 'inline-block', marginTop: '5px', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', fontWeight: '500', backgroundColor: apt.status === 'pending' ? '#FDE68A' : apt.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2', color: apt.status === 'pending' ? '#92400E' : apt.status === 'confirmed' ? '#065F46' : '#991B1B' }}>
+                      {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
+                    </span>
+                  </div>
+
+                  {/* Allows clients to cancel their own pending requests */}
+                  {apt.status === 'pending' && (
+                    <button
+                      type="button"
+                      disabled={cancellingId === apt.id}
+                      onClick={() => handleCancelAppointment(apt.id)}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#fff',
+                        color: '#D9534F',
+                        border: '1px solid #D9534F',
+                        borderRadius: '6px',
+                        cursor: cancellingId === apt.id ? 'not-allowed' : 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: '500',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {cancellingId === apt.id ? 'Cancelling...' : 'Cancel Request'}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
