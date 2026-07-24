@@ -79,10 +79,15 @@ export default function ClientPortal() {
     return `${hour}:${minuteStr} ${ampm}`
   }
 
+  // Bulletproof 24-hour calculation across all browsers
   const canCancel = (appointmentDate, startTime) => {
-    const aptDateTime = new Date(`${appointmentDate}T${startTime}`)
+    const [year, month, day] = appointmentDate.split('-').map(Number)
+    const [hour, minute] = startTime.substring(0, 5).split(':').map(Number)
+    
+    const aptDateTime = new Date(year, month - 1, day, hour, minute)
     const now = new Date()
     const hoursLeft = (aptDateTime - now) / (1000 * 60 * 60)
+    
     return hoursLeft >= 24
   }
 
