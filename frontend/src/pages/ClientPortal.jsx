@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 export default function ClientPortal() {
   const [services, setServices] = useState([])
   const [availability, setAvailability] = useState([]) 
+  const [blockedDates, setBlockedDates] = useState([]) // Stores blocked dates array
   const [selectedService, setSelectedService] = useState('')
   const [date, setDate] = useState(null) 
   const [time, setTime] = useState(null) 
@@ -19,6 +20,7 @@ export default function ClientPortal() {
     fetchServices()
     fetchMyAppointments()
     fetchAvailability() 
+    fetchBlockedDates()
   }, [])
 
   const fetchServices = async () => {
@@ -29,6 +31,18 @@ export default function ClientPortal() {
   const fetchAvailability = async () => {
     const { data, error } = await supabase.from('availability').select('*')
     if (!error) setAvailability(data)
+  }
+
+  const fetchBlockedDates = async () => {
+    const { data, error } = await supabase.from('blocked_dates').select('date')
+    if (!error && data) {
+      // Convert date strings ('YYYY-MM-DD') into JavaScript Date objects for DatePicker
+      const dateObjects = data.map(item => {
+        const [year, month, day] = item.date.split('-').map(Number)
+        return new Date(year, month - 1, day)
+      })
+      setBlockedDates(dateObjects)
+    }
   }
 
   const fetchMyAppointments = async () => {
@@ -79,7 +93,6 @@ export default function ClientPortal() {
     return `${hour}:${minuteStr} ${ampm}`
   }
 
-  // Bulletproof 24-hour calculation across all browsers
   const canCancel = (appointmentDate, startTime) => {
     const [year, month, day] = appointmentDate.split('-').map(Number)
     const [hour, minute] = startTime.substring(0, 5).split(':').map(Number)
@@ -237,6 +250,7 @@ export default function ClientPortal() {
                 selected={date} 
                 onChange={(d) => { setDate(d); setTime(null); }} 
                 minDate={new Date()} 
+                excludeDates={blockedDates} // <-- Greys out blocked days on the calendar!
                 placeholderText="Select your date"
                 dateFormat="MMMM d, yyyy"
                 required

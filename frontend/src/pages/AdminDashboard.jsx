@@ -50,6 +50,7 @@ export default function AdminDashboard() {
         {/* Your imported management components */}
         <AdminAppointments />
         <AvailabilityManager />
+        <BlockedDatesManager/>
 
         {/* Your Services form */}
         <Card tone="default">
