@@ -37,3 +37,9 @@ body {
 input, select, button, textarea {
   font-family: 'Montserrat', sans-serif;
 }
+
+/* Hide the default browser password reveal button */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
