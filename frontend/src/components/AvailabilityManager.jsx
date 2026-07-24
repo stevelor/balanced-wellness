@@ -1,108 +1,184 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { useSupabaseTable } from '../hooks/useSupabaseTable'
-import Card from './Card'
 import Button from './Button'
+import toast from 'react-hot-toast'
 
 export default function AvailabilityManager() {
-  const { data: availabilityList, loading, refetch } = useSupabaseTable('availability', {
-    orderBy: 'day_of_week',
-    ascending: true,
-  })
-
-  const [dayOfWeek, setDayOfWeek] = useState('1') // Default to Monday
+  const [availabilities, setAvailabilities] = useState([])
+  const [dayOfWeek, setDayOfWeek] = useState(1) // Defaults to Monday
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('17:00')
-  const [statusMessage, setStatusMessage] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const daysMap = {
-    0: 'Sunday', 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday',
-    4: 'Thursday', 5: 'Friday', 6: 'Saturday'
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
+  useEffect(() => {
+    fetchAvailabilities()
+  }, [])
+
+  const fetchAvailabilities = async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('availability')
+      .select('*')
+      .order('day_of_week', { ascending: true })
+    
+    if (!error) setAvailabilities(data)
+    setLoading(false)
   }
 
-  const handleAddAvailability = async (e) => {
+  // --- Helper to format 24h time to 12h AM/PM ---
+  const formatTime = (timeString) => {
+    if (!timeString) return ''
+    const [hourStr, minuteStr] = timeString.split(':')
+    let hour = parseInt(hourStr, 10)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    hour = hour % 12 || 12
+    return `${hour}:${minuteStr} ${ampm}`
+  }
+
+  const handleSaveHours = async (e) => {
     e.preventDefault()
-    setStatusMessage('Saving hours...')
+    setIsSubmitting(true)
 
-    const { error } = await supabase
-      .from('availability')
-      .insert([{ day_of_week: parseInt(dayOfWeek), start_time: startTime, end_time: endTime }])
+    const selectedDayInt = parseInt(dayOfWeek)
+    const existingDay = availabilities.find(a => a.day_of_week === selectedDayInt)
 
-    if (error) {
-      setStatusMessage(`Error: ${error.message}`)
+    if (existingDay) {
+      // Smart Update: If the day already exists, update the hours instead of creating a duplicate
+      const { error } = await supabase
+        .from('availability')
+        .update({ start_time: startTime, end_time: endTime })
+        .eq('id', existingDay.id)
+      
+      if (error) {
+        toast.error(`Error updating hours: ${error.message}`)
+      } else {
+        toast.success(`${days[selectedDayInt]} hours updated!`)
+        fetchAvailabilities()
+      }
     } else {
-      setStatusMessage('Hours saved successfully!')
-      refetch()
+      // Insert: If it's a new day being added
+      const { error } = await supabase
+        .from('availability')
+        .insert([{ day_of_week: selectedDayInt, start_time: startTime, end_time: endTime }])
+      
+      if (error) {
+        toast.error(`Error saving hours: ${error.message}`)
+      } else {
+        toast.success(`${days[selectedDayInt]} added to schedule!`)
+        fetchAvailabilities()
+      }
     }
+    setIsSubmitting(false)
   }
 
   const handleDelete = async (id) => {
-    const { error } = await supabase.from('availability').delete().eq('id', id)
-    if (error) alert(`Error deleting: ${error.message}`)
-    else refetch()
+    const { error } = await supabase
+      .from('availability')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      toast.error(`Error removing day: ${error.message}`)
+    } else {
+      toast.success("Working day removed.")
+      fetchAvailabilities()
+    }
   }
 
   return (
-    <Card tone="muted">
-      <h3>Set Weekly Working Hours</h3>
+    <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', border: '1px solid #ddd', marginTop: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+      <h3 style={{ margin: '0 0 5px 0', color: '#2c3e50' }}>Weekly Working Hours</h3>
+      <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '20px' }}>
+        Set standard weekly hours. The booking calendar will automatically generate available time slots between these times.
+      </p>
 
-      <form onSubmit={handleAddAvailability} style={{ display: 'flex', gap: '10px', alignItems: 'end', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div className="form-group">
-          <label>Day of Week:</label>
-          <select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)} style={{ padding: '8px' }}>
-            {Object.entries(daysMap).map(([num, name]) => (
-              <option key={num} value={num}>{name}</option>
+      {/* --- ADD/UPDATE HOURS FORM --- */}
+      <form onSubmit={handleSaveHours} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', alignItems: 'end', backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '25px' }}>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <label style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>Day of Week</label>
+          <select 
+            value={dayOfWeek} 
+            onChange={(e) => setDayOfWeek(e.target.value)}
+            style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '0.95rem' }}
+          >
+            {days.map((day, index) => (
+              <option key={index} value={index}>{day}</option>
             ))}
           </select>
         </div>
 
-        <div className="form-group">
-          <label>Start Time:</label>
-          <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} required style={{ padding: '8px' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <label style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>Start Time</label>
+          <input 
+            type="time" 
+            value={startTime} 
+            onChange={(e) => setStartTime(e.target.value)} 
+            required
+            style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '0.95rem', fontFamily: 'sans-serif' }}
+          />
         </div>
 
-        <div className="form-group">
-          <label>End Time:</label>
-          <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} required style={{ padding: '8px' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <label style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>End Time</label>
+          <input 
+            type="time" 
+            value={endTime} 
+            onChange={(e) => setEndTime(e.target.value)} 
+            required
+            style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '0.95rem', fontFamily: 'sans-serif' }}
+          />
         </div>
 
-        <Button type="submit" variant="primary" style={{ backgroundColor: '#007bff' }}>
-          Add Hours
+        <Button 
+          variant="primary" 
+          type="submit" 
+          disabled={isSubmitting}
+          style={{ height: '40px', backgroundColor: isSubmitting ? '#aebfad' : '#899E8B' }}
+        >
+          {isSubmitting ? 'Saving...' : 'Set Hours'}
         </Button>
       </form>
 
-      {statusMessage && (
-        <p className={`status-message ${statusMessage.includes('Error') ? 'status-message-error' : 'status-message-success'}`}>
-          {statusMessage}
-        </p>
-      )}
-
+      {/* --- CURRENT SCHEDULE DISPLAY --- */}
+      <h4 style={{ color: '#2c3e50', marginBottom: '15px' }}>Current Schedule</h4>
+      
       {loading ? (
-        <p className="loading-text">Loading availability...</p>
-      ) : availabilityList.length > 0 && (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Day</th>
-              <th>Hours</th>
-              <th style={{ textAlign: 'right' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {availabilityList.map(slot => (
-              <tr key={slot.id}>
-                <td style={{ fontWeight: 'bold' }}>{daysMap[slot.day_of_week]}</td>
-                <td>
-                  {slot.start_time.substring(0, 5)} - {slot.end_time.substring(0, 5)}
-                </td>
-                <td style={{ textAlign: 'right' }}>
-                  <button className="btn-link-danger" onClick={() => handleDelete(slot.id)}>Remove</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <p style={{ color: '#666' }}>Loading schedule...</p>
+      ) : availabilities.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '20px', color: '#888', border: '1px dashed #ccc', borderRadius: '8px' }}>
+          <p style={{ margin: 0 }}>No weekly hours are set. Clients currently cannot book any sessions.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {availabilities.map(item => (
+            <div 
+              key={item.id} 
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '12px 15px', borderRadius: '8px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+            >
+              <div>
+                <strong style={{ display: 'inline-block', width: '100px', color: '#2c3e50' }}>{days[item.day_of_week]}</strong>
+                <span style={{ color: '#666' }}>
+                  {formatTime(item.start_time)} — {formatTime(item.end_time)}
+                </span>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => handleDelete(item.id)}
+                style={{ background: 'none', border: 'none', color: '#D9534F', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', padding: '5px 10px', borderRadius: '4px', transition: 'background-color 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#FDE2E2'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                title="Remove Day"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
       )}
-    </Card>
+    </div>
   )
 }
