@@ -9,9 +9,12 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  
+  // 1. Added the state to track if the password should be visible
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    // 1. Check if they already have a valid session right now
+    // Check if they already have a valid session right now
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         navigate('/portal'); // Redirects to your portal route
@@ -20,7 +23,7 @@ export default function Auth() {
       }
     });
 
-    // 2. Listen for auth updates (like clicking the email link)
+    // Listen for auth updates (like clicking the email link)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         navigate('/portal');
@@ -63,16 +66,40 @@ export default function Auth() {
             style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
           />
         </div>
+        
+        {/* 2. Updated the password input to include the toggle button */}
         <div>
           <label style={{ display: 'block', marginBottom: '5px' }}>Password: </label>
-          <input 
-            type="password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-          />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input 
+              type={showPassword ? "text" : "password"} 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              required 
+              style={{ width: '100%', padding: '8px', paddingRight: '40px', boxSizing: 'border-box' }}
+            />
+            <button 
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{ 
+                position: 'absolute', 
+                right: '10px', 
+                background: 'none', 
+                border: 'none', 
+                cursor: 'pointer',
+                fontSize: '1.2rem',
+                padding: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? "🙈" : "👁️"} 
+            </button>
+          </div>
         </div>
+
         <button type="submit" disabled={loading} style={{ padding: '10px', cursor: 'pointer', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
           {loading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Log In'}
         </button>
