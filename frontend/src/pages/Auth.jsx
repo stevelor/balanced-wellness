@@ -10,10 +10,14 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // NEW: State to control whether we show the dedicated Reset screen
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+      // If they are logged in, make sure they aren't actively clicking a recovery link
+      if (session && !window.location.hash.includes('type=recovery')) {
         navigate('/portal'); 
       } else {
         setIsVerifying(false);
@@ -21,8 +25,14 @@ export default function Auth() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        navigate('/portal');
+      // THE FIX: Listen specifically for password recovery and route them to the new page
+      if (event === 'PASSWORD_RECOVERY') {
+        navigate('/update-password');
+      } else if (event === 'SIGNED_IN' && session) {
+        // Prevent normal login routing if they are recovering a password
+        if (!window.location.hash.includes('type=recovery')) {
+          navigate('/portal');
+        }
       }
     });
 
@@ -44,16 +54,10 @@ export default function Auth() {
     setLoading(false);
   };
 
-  // NEW: The forgot password function
-  const handleForgotPassword = async () => {
-    if (!email) {
-      alert("Please type your email into the email box first!");
-      return;
-    }
-    
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      // This dynamically grabs your website URL (localhost for testing, donnabooking.com for live)
       redirectTo: `${window.location.origin}/update-password`,
     });
     
@@ -61,6 +65,7 @@ export default function Auth() {
       alert(`Error: ${error.message}`);
     } else {
       alert("Password reset link sent! Please check your email.");
+      setIsResetting(false); // Send them back to the normal login view
     }
     setLoading(false);
   };
@@ -69,6 +74,40 @@ export default function Auth() {
     return <div style={{ textAlign: 'center', marginTop: '50px', fontFamily: 'sans-serif' }}>Verifying your account...</div>;
   }
 
+  // --- THE NEW DEDICATED FORGOT PASSWORD SCREEN ---
+  if (isResetting) {
+    return (
+      <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px', fontFamily: 'sans-serif' }}>
+        <h2 style={{ textAlign: 'center' }}>Reset Password</h2>
+        <p style={{ textAlign: 'center', fontSize: '0.9em', color: '#666', marginBottom: '20px' }}>
+          Enter your email address and we will send you a link to reset your password.
+        </p>
+        <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px' }}>Email: </label>
+            <input 
+              type="email" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              required 
+              style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+            />
+          </div>
+          <button type="submit" disabled={loading} style={{ padding: '10px', cursor: 'pointer', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
+            {loading ? 'Sending...' : 'Send Reset Link'}
+          </button>
+        </form>
+        <p 
+          style={{ marginTop: '15px', cursor: 'pointer', color: '#0066cc', textAlign: 'center' }} 
+          onClick={() => setIsResetting(false)}
+        >
+          Back to Login
+        </p>
+      </div>
+    );
+  }
+
+  // --- THE STANDARD LOGIN / SIGN UP SCREEN ---
   return (
     <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px', fontFamily: 'sans-serif' }}>
       <h2 style={{ textAlign: 'center' }}>{isSignUp ? 'Create Account' : 'Client Login'}</h2>
@@ -91,7 +130,7 @@ export default function Auth() {
               type={showPassword ? "text" : "password"} 
               value={password} 
               onChange={(e) => setPassword(e.target.value)} 
-              required={!isSignUp ? false : true} // Make it not strictly required if they are just resetting
+              required 
               style={{ width: '100%', padding: '8px', paddingRight: '40px', boxSizing: 'border-box' }}
             />
             <button 
@@ -103,10 +142,10 @@ export default function Auth() {
             </button>
           </div>
           
-          {/* NEW: Forgot password link (only shows on the Login screen) */}
+          {/* Changes view instead of triggering email send instantly */}
           {!isSignUp && (
             <div style={{ textAlign: 'right', marginTop: '8px' }}>
-              <button type="button" onClick={handleForgotPassword} style={{ background: 'none', border: 'none', color: '#0066cc', cursor: 'pointer', fontSize: '0.9em', padding: 0 }}>
+              <button type="button" onClick={() => setIsResetting(true)} style={{ background: 'none', border: 'none', color: '#0066cc', cursor: 'pointer', fontSize: '0.9em', padding: 0 }}>
                 Forgot Password?
               </button>
             </div>
