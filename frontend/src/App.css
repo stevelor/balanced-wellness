@@ -404,3 +404,27 @@
   color: #666;
   font-style: italic;
 }
+
+/* --- GLOBAL BUTTON INTERACTIONS --- */
+button {
+  transition: all 0.2s ease-in-out !important; 
+}
+
+/* Lifts the button up and adds a drop shadow on hover */
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+  filter: brightness(1.05); /* Slightly brightens any background color */
+}
+
+/* Pushes the button down when actively clicked */
+button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Ensures loading/disabled buttons look unclickable */
+button:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.65;
+}
