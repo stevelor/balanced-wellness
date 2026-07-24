@@ -7,6 +7,7 @@ import Navbar from '../components/Navbar'
 import Card from '../components/Card'
 import Button from '../components/Button'
 import ServiceListItem from '../components/ServiceListItem'
+import BlockedDatesManager from '../components/BlockedDatesManager'
 
 export default function AdminDashboard() {
   const { data: servicesList, loading, refetch } = useSupabaseTable('services', {
