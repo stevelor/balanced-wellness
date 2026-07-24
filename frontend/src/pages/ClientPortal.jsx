@@ -3,17 +3,15 @@ import { supabase } from '../supabaseClient'
 import Navbar from '../components/Navbar'
 import DatePicker from "react-datepicker"
 import "react-datepicker/dist/react-datepicker.css"
-import toast from 'react-hot-toast' // <-- NEW IMPORT
+import toast from 'react-hot-toast'
 
 export default function ClientPortal() {
   const [services, setServices] = useState([])
   const [availability, setAvailability] = useState([]) 
   const [selectedService, setSelectedService] = useState('')
   const [date, setDate] = useState(null) 
-  const [time, setTime] = useState(null) 
+  const [time, setTime] = useState(null) // Stores selected time string like '09:00'
   const [myAppointments, setMyAppointments] = useState([])
-  
-  // NEW: State to handle the button loading animation
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
@@ -45,44 +43,57 @@ export default function ClientPortal() {
     }
   }
 
+  // Helper to generate 30-minute time slots based on availability for the selected day
+  const getAvailableTimeSlots = () => {
+    if (!date || availability.length === 0) return []
+    const dayOfWeek = date.getDay()
+    const dayRules = availability.filter(a => a.day_of_week === dayOfWeek)
+    
+    if (dayRules.length === 0) return []
+
+    let slots = []
+    dayRules.forEach(rule => {
+      let [currentHour, currentMinute] = rule.start_time.substring(0, 5).split(':').map(Number)
+      const [endHour, endMinute] = rule.end_time.substring(0, 5).split(':').map(Number)
+
+      while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
+        const formattedHour = String(currentHour).padStart(2, '0')
+        const formattedMinute = String(currentMinute).padStart(2, '0')
+        slots.push(`${formattedHour}:${formattedMinute}`)
+
+        currentMinute += 30
+        if (currentMinute >= 60) {
+          currentMinute = 0
+          currentHour += 1
+        }
+      }
+    })
+    return slots
+  }
+
+  // Formats '09:30' into a clean 12-hour display like '9:30 AM'
+  const formatDisplayTime = (timeString) => {
+    const [hourStr, minuteStr] = timeString.split(':')
+    let hour = parseInt(hourStr, 10)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    hour = hour % 12 || 12
+    return `${hour}:${minuteStr} ${ampm}`
+  }
+
   const handleBooking = async (e) => {
     e.preventDefault()
     
-    // UI VALIDATION (with toasts!)
     if (!selectedService) {
       toast.error("Please select a healing service for your session.")
       return
     }
     if (!date || !time) {
-      toast.error("Please select both a valid date and time.")
+      toast.error("Please select both a valid date and time slot.")
       return
     }
 
-    setIsSubmitting(true) // Disable the button and show loading state
-    
+    setIsSubmitting(true)
     const formattedDate = date.toLocaleDateString('en-CA') 
-    const formattedTime = time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-    
-    const dayOfWeek = date.getDay() 
-    const dayRules = availability.filter(a => a.day_of_week === dayOfWeek)
-    
-    if (dayRules.length === 0) {
-      toast.error("We are closed on this day of the week. Please select another day.")
-      setIsSubmitting(false)
-      return 
-    }
-
-    const isValidTime = dayRules.some(rule => {
-      const ruleStart = rule.start_time.substring(0, 5)
-      const ruleEnd = rule.end_time.substring(0, 5)
-      return formattedTime >= ruleStart && formattedTime <= ruleEnd
-    })
-
-    if (!isValidTime) {
-      toast.error("The selected time falls outside of our available hours.")
-      setIsSubmitting(false)
-      return 
-    }
 
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -95,7 +106,7 @@ export default function ClientPortal() {
           client_email: user.email, 
           service_id: selectedService,
           appointment_date: formattedDate,
-          start_time: formattedTime,
+          start_time: time,
           status: 'pending'
         }
       ])
@@ -114,25 +125,23 @@ export default function ClientPortal() {
           clientName: user.user_metadata?.full_name || 'Client',
           serviceName: services.find(s => s.id === selectedService)?.name,
           date: formattedDate,
-          time: formattedTime
+          time: time
         }
       })
-      
-      // If everything works, show the beautiful success toast
       toast.success('Your session has been successfully requested!')
-      
     } catch (emailError) {
       console.error("Email failed to send:", emailError)
       toast.success('Session requested, but there was an issue sending the email receipt.')
     }
 
-    // 3. RESET THE FORM
     setSelectedService('')
     setDate(null)
     setTime(null)
     fetchMyAppointments() 
-    setIsSubmitting(false) // Re-enable the button
+    setIsSubmitting(false)
   }
+
+  const timeSlots = getAvailableTimeSlots()
 
   return (
     <>
@@ -144,39 +153,26 @@ export default function ClientPortal() {
 
         <div style={{ backgroundColor: '#F4F1EA', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
           <h3>Book Your Session</h3>
-          
-          {availability.length > 0 && (
-            <div style={{ backgroundColor: '#fff', padding: '10px', borderRadius: '4px', fontSize: '0.85em', color: '#555', marginBottom: '20px' }}>
-              <strong>Available Hours:</strong>
-              <ul style={{ margin: '5px 0 0 0', paddingLeft: '20px' }}>
-                {availability.map(a => (
-                  <li key={a.id}>
-                     Day {a.day_of_week}: {a.start_time.substring(0, 5)} - {a.end_time.substring(0, 5)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
           <form onSubmit={handleBooking} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
+            {/* Service Selection */}
             <div>
               <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500' }}>How can we help you heal today?</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
                 {services.map(service => (
                   <div 
                     key={service.id}
-                    onClick={() => setSelectedService(service.id)}
+                    onClick={() => !isSubmitting && setSelectedService(service.id)}
                     style={{
                       padding: '15px',
                       border: selectedService === service.id ? '2px solid #899E8B' : '1px solid #ddd',
                       borderRadius: '8px',
                       backgroundColor: selectedService === service.id ? '#e9efe9' : '#fff',
-                      cursor: 'pointer',
+                      cursor: isSubmitting ? 'not-allowed' : 'pointer',
                       transition: 'all 0.2s ease',
                       boxShadow: selectedService === service.id ? '0 4px 8px rgba(0,0,0,0.05)' : 'none',
-                      opacity: isSubmitting ? 0.6 : 1, // Dims while submitting
-                      pointerEvents: isSubmitting ? 'none' : 'auto' // Prevents clicking while submitting
+                      opacity: isSubmitting ? 0.6 : 1,
                     }}
                   >
                     <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50', fontSize: '1.1em' }}>{service.name}</h4>
@@ -187,39 +183,58 @@ export default function ClientPortal() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginTop: '5px' }}>
-              <div style={{ flex: '1 1 200px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#2c3e50' }}>Choose a Date:</label>
-                <DatePicker 
-                  selected={date} 
-                  onChange={(d) => setDate(d)} 
-                  minDate={new Date()} 
-                  placeholderText="Select your date"
-                  dateFormat="MMMM d, yyyy"
-                  required
-                  disabled={isSubmitting} // Locks the calendar while loading
-                />
-              </div>
-              <div style={{ flex: '1 1 200px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#2c3e50' }}>Choose a Time:</label>
-                <DatePicker 
-                  selected={time} 
-                  onChange={(t) => setTime(t)} 
-                  showTimeSelect 
-                  showTimeSelectOnly
-                  timeIntervals={30}
-                  timeCaption="Time"
-                  dateFormat="h:mm aa"
-                  placeholderText="Select your time"
-                  required
-                  disabled={isSubmitting} // Locks the time picker while loading
-                />
-              </div>
+            {/* Date Selection */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontWeight: '600', color: '#2c3e50' }}>Choose a Date:</label>
+              <DatePicker 
+                selected={date} 
+                onChange={(d) => { setDate(d); setTime(null); }} 
+                minDate={new Date()} 
+                placeholderText="Select your date"
+                dateFormat="MMMM d, yyyy"
+                required
+                disabled={isSubmitting}
+                wrapperClassName="date-picker-wrapper"
+              />
             </div>
+
+            {/* Smart Clickable Time Chips */}
+            {date && (
+              <div>
+                <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#2c3e50' }}>Choose an Available Time Slot:</label>
+                {timeSlots.length === 0 ? (
+                  <p style={{ color: '#D9534F', fontSize: '0.95rem', margin: 0 }}>We are closed on this day of the week. Please choose another date.</p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
+                    {timeSlots.map(slot => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setTime(slot)}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: '6px',
+                          border: time === slot ? '2px solid #899E8B' : '1px solid #ddd',
+                          backgroundColor: time === slot ? '#899E8B' : '#fff',
+                          color: time === slot ? '#fff' : '#2c3e50',
+                          fontWeight: time === slot ? 'bold' : 'normal',
+                          cursor: 'pointer',
+                          fontSize: '0.95rem',
+                          textAlign: 'center',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {formatDisplayTime(slot)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             
             <button 
               type="submit" 
-              disabled={isSubmitting} // Prevents double clicking
+              disabled={isSubmitting}
               style={{ 
                 padding: '14px', 
                 backgroundColor: isSubmitting ? '#aebfad' : '#899E8B', 
@@ -239,6 +254,7 @@ export default function ClientPortal() {
           </form>
         </div>
 
+        {/* Upcoming Sessions List */}
         <div>
           <h3>Your Upcoming Sessions</h3>
           {myAppointments.length === 0 ? (
@@ -248,7 +264,7 @@ export default function ClientPortal() {
               {myAppointments.map((apt) => (
                 <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                   <strong style={{ fontSize: '1.1em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
-                  <span style={{ color: '#666', display: 'block', margin: '5px 0' }}>Date: {apt.appointment_date} at {apt.start_time.substring(0, 5)}</span>
+                  <span style={{ color: '#666', display: 'block', margin: '5px 0' }}>Date: {apt.appointment_date} at {formatDisplayTime(apt.start_time)}</span>
                   <span style={{ display: 'inline-block', marginTop: '5px', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', fontWeight: '500', backgroundColor: apt.status === 'pending' ? '#FDE68A' : apt.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2', color: apt.status === 'pending' ? '#92400E' : apt.status === 'confirmed' ? '#065F46' : '#991B1B' }}>
                     {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
                   </span>
