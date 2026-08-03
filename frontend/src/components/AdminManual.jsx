@@ -3,10 +3,10 @@ import { supabase } from '../supabaseClient'
 import Button from './Button'
 import toast from 'react-hot-toast'
 
-export default function AdminManual() {
+export default function AdminManualBooking() {
   const [services, setServices] = useState([])
   const [selectedService, setSelectedService] = useState('')
-  const [clientName, setClientName] = useState('') // <-- NEW: Collects the name
+  const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -33,7 +33,7 @@ export default function AdminManual() {
         {
           client_id: user.id, 
           client_email: clientEmail, 
-          client_name: clientName, // <-- NEW: Saves the manual name to the database
+          client_name: clientName, 
           service_id: selectedService,
           appointment_date: date,
           start_time: time,
@@ -51,20 +51,24 @@ export default function AdminManual() {
 
     if (clientEmail) {
       try {
-        const serviceName = services.find(s => s.id === selectedService)?.name
+        const serviceObj = services.find(s => s.id === selectedService)
+        
         const [hourStr, minuteStr] = time.split(':')
         let hour = parseInt(hourStr, 10)
         const ampm = hour >= 12 ? 'PM' : 'AM'
         hour = hour % 12 || 12
         const formattedTime = `${hour}:${minuteStr} ${ampm}`
 
+        // --- UPDATED: Passing duration and price from the selected service ---
         await supabase.functions.invoke('send-email', {
           body: { 
             clientEmail: clientEmail, 
-            clientName: clientName || 'Client', // <-- NEW: Uses the name in the email
-            serviceName: serviceName,
+            clientName: clientName || 'Client', 
+            serviceName: serviceObj?.name,
             date: date,
             time: formattedTime,
+            duration: serviceObj?.duration_minutes || 60,
+            price: serviceObj?.price || 0,
             status: 'confirmed'
           }
         })
@@ -80,9 +84,7 @@ export default function AdminManual() {
     setTime('')
     setIsSubmitting(false)
     
-    setTimeout(() => {
-      window.location.reload()
-    }, 1500)
+    setTimeout(() => window.location.reload(), 1500)
   }
 
   return (
@@ -109,7 +111,6 @@ export default function AdminManual() {
           </select>
         </div>
 
-        {/* --- NEW: Client Name Input --- */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 150px' }}>
           <label style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>Client Name</label>
           <input 

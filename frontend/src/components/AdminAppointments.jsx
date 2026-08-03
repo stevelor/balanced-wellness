@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 
 export default function AdminAppointments() {
   const { data: appointments, loading, refetch } = useSupabaseTable('appointments', {
+    // --- UPDATED: Now queries for duration_minutes and price ---
     select: `
       id,
       appointment_date,
@@ -15,7 +16,7 @@ export default function AdminAppointments() {
       status,
       client_email,
       client_name, 
-      services (name)
+      services (name, duration_minutes, price)
     `,
     orderBy: 'appointment_date',
     ascending: true, 
@@ -58,13 +59,16 @@ export default function AdminAppointments() {
     toast.success(`Appointment successfully ${newStatus}!`)
 
     if (appointment) {
+      // --- UPDATED: Passing the duration and price to the email function ---
       supabase.functions.invoke('send-email', {
         body: {
           clientEmail: appointment.client_email,
           clientName: appointment.client_name || 'there', 
-          serviceName: appointment.services?.name ?? 'Unknown service',
+          serviceName: appointment.services?.name ?? 'Healing Session',
           date: appointment.appointment_date,
           time: formatTime(appointment.start_time),
+          duration: appointment.services?.duration_minutes || 60,
+          price: appointment.services?.price || 0,
           status: newStatus,
         },
       }).catch(err => console.error('Email notification failed:', err))
@@ -138,8 +142,6 @@ export default function AdminAppointments() {
         
         <div style={{ overflowX: 'auto', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #eaeaea' }}>
           <table className="data-table" style={{ margin: 0, width: '100%', borderCollapse: 'collapse' }}>
-            
-            {/* --- GLOBAL TABLE HEADERS (Only appears once at the top) --- */}
             <thead>
               <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
                 <th style={{ width: '25%', textAlign: 'left', padding: '14px 15px', color: '#4b5563' }}>Client</th>
@@ -156,8 +158,6 @@ export default function AdminAppointments() {
 
                 return (
                   <Fragment key={dateStr}>
-                    
-                    {/* --- FULL-WIDTH DATE DIVIDER ROW --- */}
                     <tr>
                       <td colSpan={showHistory ? 4 : 5} style={{ 
                         backgroundColor: '#e9efe9', 
@@ -173,10 +173,8 @@ export default function AdminAppointments() {
                       </td>
                     </tr>
                     
-                    {/* --- APPOINTMENT DATA ROWS --- */}
                     {aptsForDate.map(apt => (
                       <tr key={apt.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        
                         <td style={{ padding: '12px 15px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <strong style={{ color: '#2c3e50' }}>{apt.client_name || 'Guest User'}</strong>
@@ -200,20 +198,10 @@ export default function AdminAppointments() {
                           <td style={{ padding: '12px 15px', textAlign: 'right' }}>
                             {apt.status === 'pending' && (
                               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                <Button
-                                  variant="success"
-                                  className="btn-sm"
-                                  disabled={processingId === apt.id}
-                                  onClick={() => updateStatus(apt.id, 'confirmed')}
-                                >
+                                <Button variant="success" className="btn-sm" disabled={processingId === apt.id} onClick={() => updateStatus(apt.id, 'confirmed')}>
                                   {processingId === apt.id ? '...' : 'Confirm'}
                                 </Button>
-                                <Button
-                                  variant="danger"
-                                  className="btn-sm"
-                                  disabled={processingId === apt.id}
-                                  onClick={() => updateStatus(apt.id, 'cancelled')}
-                                >
+                                <Button variant="danger" className="btn-sm" disabled={processingId === apt.id} onClick={() => updateStatus(apt.id, 'cancelled')}>
                                   {processingId === apt.id ? '...' : 'Cancel'}
                                 </Button>
                               </div>
