@@ -13,21 +13,30 @@ serve(async (req) => {
   }
 
   try {
-    const { clientEmail, clientName, serviceName, date, time, status, duration, price } = await req.json();
+    // --- THE FIX: Added defaults (like status = 'pending') so it never fails ---
+    const { 
+      clientEmail, 
+      clientName = 'Client', 
+      serviceName = 'Session', 
+      date, 
+      time, 
+      status = 'pending', 
+      duration = 60, 
+      price = 0 
+    } = await req.json();
 
-    // Mathematically formats the date to exactly what your mom requested (e.g., "Wednesday, 8/5")
     const [year, month, day] = date.split('-');
     const dateObj = new Date(year, month - 1, day);
     const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
     const formattedMonthDay = `${parseInt(month)}/${parseInt(day)}`;
 
-    let subject = '';
-    let htmlBody = '';
+    // Ultimate fallback if something completely unexpected happens
+    let subject = 'Session Update';
+    let htmlBody = '<p>There has been an update to your session.</p>';
 
     if (status === 'confirmed') {
       subject = `✨ Confirmation: Your Reiki Session with Donna`;
       
-      // THIS IS YOUR EXACT CUSTOM TEMPLATE:
       htmlBody = `
         <p>✨Hi ${clientName},</p>
         <p>This is a reminder of your ${serviceName} session on <strong>${dayOfWeek}, ${formattedMonthDay} at ${time}</strong>.</p>
@@ -73,7 +82,6 @@ serve(async (req) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        // NOTE: Make sure this email matches your verified sending domain!
         from: 'Balanced Wellness <appointments@donnabooking.com>', 
         to: [clientEmail],
         subject: subject,
