@@ -74,7 +74,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         // NOTE: Make sure this email matches your verified sending domain!
-        from: 'Balanced Wellness <onboarding@resend.dev>', 
+        from: 'Balanced Wellness <appointments@donnabooking.com>', 
         to: [clientEmail],
         subject: subject,
         html: htmlBody,
