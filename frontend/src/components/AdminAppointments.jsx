@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { supabase } from '../supabaseClient'
 import { useSupabaseTable } from '../hooks/useSupabaseTable'
 import Card from './Card'
@@ -13,7 +13,8 @@ export default function AdminAppointments() {
       appointment_date,
       start_time,
       status,
-      client_email, 
+      client_email,
+      client_name, 
       services (name)
     `,
     orderBy: 'appointment_date',
@@ -32,7 +33,6 @@ export default function AdminAppointments() {
     return `${hour}:${minuteStr} ${ampm}`
   }
 
-  // --- NEW: Helper to format the date header nicely (e.g., "Monday, August 3, 2026") ---
   const formatDisplayDate = (dateString) => {
     const [year, month, day] = dateString.split('-').map(Number)
     const d = new Date(year, month - 1, day)
@@ -61,7 +61,7 @@ export default function AdminAppointments() {
       supabase.functions.invoke('send-email', {
         body: {
           clientEmail: appointment.client_email,
-          clientName: 'there', 
+          clientName: appointment.client_name || 'there', 
           serviceName: appointment.services?.name ?? 'Unknown service',
           date: appointment.appointment_date,
           time: formatTime(appointment.start_time),
@@ -91,7 +91,6 @@ export default function AdminAppointments() {
     return showHistory ? dateB - dateA : dateA - dateB
   })
 
-  // --- NEW: Extract unique dates in their currently sorted order ---
   const uniqueDates = [...new Set(displayedAppointments.map(apt => apt.appointment_date))]
 
   return (
@@ -137,51 +136,68 @@ export default function AdminAppointments() {
 
       ) : (
         
-        // --- NEW: Map through each unique date to create a grouped section ---
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-          {uniqueDates.map(dateStr => {
-            const aptsForDate = displayedAppointments.filter(apt => apt.appointment_date === dateStr)
+        <div style={{ overflowX: 'auto', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #eaeaea' }}>
+          <table className="data-table" style={{ margin: 0, width: '100%', borderCollapse: 'collapse' }}>
+            
+            {/* --- GLOBAL TABLE HEADERS (Only appears once at the top) --- */}
+            <thead>
+              <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                <th style={{ width: '25%', textAlign: 'left', padding: '14px 15px', color: '#4b5563' }}>Client</th>
+                <th style={{ width: '25%', textAlign: 'left', padding: '14px 15px', color: '#4b5563' }}>Service</th>
+                <th style={{ width: '15%', textAlign: 'left', padding: '14px 15px', color: '#4b5563' }}>Time</th>
+                <th style={{ width: '15%', textAlign: 'center', padding: '14px 15px', color: '#4b5563' }}>Status</th>
+                {!showHistory && <th style={{ width: '20%', textAlign: 'right', padding: '14px 15px', color: '#4b5563' }}>Actions</th>}
+              </tr>
+            </thead>
+            
+            <tbody>
+              {uniqueDates.map(dateStr => {
+                const aptsForDate = displayedAppointments.filter(apt => apt.appointment_date === dateStr)
 
-            return (
-              <div key={dateStr}>
-                {/* Section Header for the Date */}
-                <h4 style={{ 
-                  backgroundColor: '#e9efe9', 
-                  padding: '10px 15px', 
-                  borderRadius: '6px', 
-                  color: '#2c3e50', 
-                  margin: '0 0 10px 0',
-                  fontSize: '1.05rem',
-                  borderLeft: '4px solid #899E8B'
-                }}>
-                  {formatDisplayDate(dateStr)}
-                </h4>
-                
-                <table className="data-table" style={{ margin: 0 }}>
-                  <thead>
+                return (
+                  <Fragment key={dateStr}>
+                    
+                    {/* --- FULL-WIDTH DATE DIVIDER ROW --- */}
                     <tr>
-                      <th style={{ width: '30%' }}>Service</th>
-                      <th style={{ width: '20%' }}>Time</th>
-                      <th style={{ width: '25%', textAlign: 'center' }}>Status</th>
-                      {!showHistory && <th style={{ width: '25%', textAlign: 'right' }}>Actions</th>}
+                      <td colSpan={showHistory ? 4 : 5} style={{ 
+                        backgroundColor: '#e9efe9', 
+                        padding: '10px 15px', 
+                        color: '#2c3e50', 
+                        fontSize: '1.05rem',
+                        fontWeight: '600',
+                        borderLeft: '4px solid #899E8B',
+                        borderTop: '1px solid #eaeaea',
+                        borderBottom: '1px solid #eaeaea'
+                      }}>
+                        {formatDisplayDate(dateStr)}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
+                    
+                    {/* --- APPOINTMENT DATA ROWS --- */}
                     {aptsForDate.map(apt => (
-                      <tr key={apt.id}>
-                        <td style={{ fontWeight: 'bold' }}>{apt.services?.name}</td>
+                      <tr key={apt.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                         
-                        {/* Only the time is displayed here now since the date is in the header above */}
-                        <td style={{ color: '#4b5563' }}>
+                        <td style={{ padding: '12px 15px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <strong style={{ color: '#2c3e50' }}>{apt.client_name || 'Guest User'}</strong>
+                            <span style={{ fontSize: '0.85rem', color: '#666' }}>{apt.client_email}</span>
+                          </div>
+                        </td>
+
+                        <td style={{ padding: '12px 15px', fontWeight: '500', color: '#374151' }}>
+                          {apt.services?.name}
+                        </td>
+                        
+                        <td style={{ padding: '12px 15px', color: '#4b5563' }}>
                           {formatTime(apt.start_time)}
                         </td>
                         
-                        <td style={{ textAlign: 'center' }}>
+                        <td style={{ padding: '12px 15px', textAlign: 'center' }}>
                           <StatusBadge status={apt.status} />
                         </td>
                         
                         {!showHistory && (
-                          <td style={{ textAlign: 'right' }}>
+                          <td style={{ padding: '12px 15px', textAlign: 'right' }}>
                             {apt.status === 'pending' && (
                               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                                 <Button
@@ -206,11 +222,11 @@ export default function AdminAppointments() {
                         )}
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )
-          })}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </Card>
