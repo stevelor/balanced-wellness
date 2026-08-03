@@ -6,6 +6,7 @@ import AdminVitals from '../components/AdminVitals'
 import AdminManual from '../components/AdminManual'
 import AdminAppointments from '../components/AdminAppointments'
 import AvailabilityManager from '../components/AvailabilityManager'
+import BlockedDatesManager from '../components/BlockedDatesManager' // <-- NEW IMPORT
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
@@ -14,7 +15,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) navigate('/login') // Redirect to login if not authenticated
+      if (!user) navigate('/login') 
     }
     checkUser()
   }, [navigate])
@@ -36,15 +37,22 @@ export default function AdminDashboard() {
         {/* --- 1. The Vitals Cards --- */}
         <AdminVitals />
 
-        {/* --- 2. The Manual Booking Tool --- */}
-        <AdminManual />
-
-        {/* --- 3. The Main Appointments Table --- */}
+        {/* --- 2. The Main Appointments Table --- */}
         <div style={{ marginTop: '30px' }}>
           <AdminAppointments />
         </div>
 
-        {/* --- 4. The Weekly Hours Manager --- */}
+        {/* --- 3. The Manual Booking Tool --- */}
+        <div style={{ marginTop: '30px' }}>
+          <AdminManual />
+        </div>
+
+        {/* --- 4. The Blocked Dates Manager (NEW!) --- */}
+        <div style={{ marginTop: '30px' }}>
+          <BlockedDatesManager />
+        </div>
+
+        {/* --- 5. The Weekly Hours Manager --- */}
         <div style={{ marginTop: '30px' }}>
           <AvailabilityManager />
         </div>
