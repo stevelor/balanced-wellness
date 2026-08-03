@@ -12,21 +12,23 @@ export default function ClientPortal() {
   const [selectedService, setSelectedService] = useState('')
   const [date, setDate] = useState(null) 
   const [time, setTime] = useState(null) 
-  const [clientName, setClientName] = useState('') // <-- NEW: Stores the client's name
+  const [clientName, setClientName] = useState('') 
   const [myAppointments, setMyAppointments] = useState([])
-  const [bookedSlots, setBookedSlots] = useState([]) 
+  
+  // --- UPDATED: Now stores both start time AND end time for overlaps ---
+  const [bookedAppointments, setBookedAppointments] = useState([]) 
+  
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cancellingId, setCancellingId] = useState(null)
 
   useEffect(() => {
-    fetchUserAccount() // Fetch the user's saved name
+    fetchUserAccount() 
     fetchServices()
     fetchMyAppointments()
     fetchAvailability() 
     fetchBlockedDates()
   }, [])
 
-  // --- NEW: Checks if they have a name saved to their account already ---
   const fetchUserAccount = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user && user.user_metadata?.full_name) {
@@ -34,24 +36,30 @@ export default function ClientPortal() {
     }
   }
 
+  // --- UPDATED: Fetches appointments AND their durations for accurate overlap math ---
   useEffect(() => {
     if (date) {
       const fetchBookedSlotsForDate = async () => {
         const formattedDate = date.toLocaleDateString('en-CA')
         const { data, error } = await supabase
           .from('appointments')
-          .select('start_time, status')
+          .select('start_time, status, services(duration_minutes)')
           .eq('appointment_date', formattedDate)
           .neq('status', 'cancelled')
         
         if (!error && data) {
-          const takenTimes = data.map(apt => apt.start_time.substring(0, 5))
-          setBookedSlots(takenTimes)
+          const booked = data.map(apt => {
+            const [h, m] = apt.start_time.split(':').map(Number)
+            const startMins = (h * 60) + m
+            const duration = apt.services?.duration_minutes || 60 
+            return { startMins, endMins: startMins + duration }
+          })
+          setBookedAppointments(booked)
         }
       }
       fetchBookedSlotsForDate()
     } else {
-      setBookedSlots([])
+      setBookedAppointments([])
     }
   }, [date])
 
@@ -96,30 +104,49 @@ export default function ClientPortal() {
     return availableDaysOfWeek.includes(day)
   }
 
+  // --- UPDATED: The Overlap Engine ---
   const getAvailableTimeSlots = () => {
-    if (!date || availability.length === 0) return []
+    if (!date || !selectedService || availability.length === 0) return []
+    
     const dayOfWeek = date.getDay()
     const dayRules = availability.filter(a => a.day_of_week === dayOfWeek)
     
     if (dayRules.length === 0) return []
 
+    const selectedServiceObj = services.find(s => s.id === selectedService)
+    const proposedDuration = selectedServiceObj ? selectedServiceObj.duration_minutes : 60
+
     let slots = []
     dayRules.forEach(rule => {
       let [currentHour, currentMinute] = rule.start_time.substring(0, 5).split(':').map(Number)
       const [endHour, endMinute] = rule.end_time.substring(0, 5).split(':').map(Number)
+      
+      const ruleEndMins = (endHour * 60) + endMinute
 
       while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
+        const slotStartMins = (currentHour * 60) + currentMinute
+        const slotEndMins = slotStartMins + proposedDuration
+
         const formattedHour = String(currentHour).padStart(2, '0')
         const formattedMinute = String(currentMinute).padStart(2, '0')
         const timeString = `${formattedHour}:${formattedMinute}`
-        
-        if (!bookedSlots.includes(timeString)) {
+
+        // 1. Check if the proposed appointment would push past the admin's closing time
+        const fitsInWorkingHours = slotEndMins <= ruleEndMins
+
+        // 2. Check if the proposed appointment overlaps with any existing booked appointments
+        const isOverlapping = bookedAppointments.some(bookedApt => {
+          return (slotStartMins < bookedApt.endMins) && (slotEndMins > bookedApt.startMins)
+        })
+
+        // If it finishes before closing time AND doesn't overlap anyone else, we show it!
+        if (fitsInWorkingHours && !isOverlapping) {
           slots.push(timeString)
         }
 
         currentMinute += 30
         if (currentMinute >= 60) {
-          currentMinute = 0
+          currentMinute -= 60
           currentHour += 1
         }
       }
@@ -163,7 +190,6 @@ export default function ClientPortal() {
     const formattedDate = date.toLocaleDateString('en-CA') 
     const { data: { user } } = await supabase.auth.getUser()
 
-    // --- NEW: Update the user's account permanently with their name ---
     await supabase.auth.updateUser({ data: { full_name: clientName } })
 
     const { error } = await supabase
@@ -172,7 +198,7 @@ export default function ClientPortal() {
         {
           client_id: user.id,
           client_email: user.email, 
-          client_name: clientName, // <-- NEW: Saves to the appointment row
+          client_name: clientName, 
           service_id: selectedService,
           appointment_date: formattedDate,
           start_time: time,
@@ -190,7 +216,7 @@ export default function ClientPortal() {
       await supabase.functions.invoke('send-email', {
         body: { 
           clientEmail: user.email, 
-          clientName: clientName, // <-- NEW: Uses their actual name in the email!
+          clientName: clientName, 
           serviceName: services.find(s => s.id === selectedService)?.name,
           date: formattedDate,
           time: formatDisplayTime(time) 
@@ -284,7 +310,6 @@ export default function ClientPortal() {
 
           <form onSubmit={handleBooking} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
-            {/* --- NEW: Client Name Input --- */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label style={{ fontWeight: '600', color: '#2c3e50' }}>Your Full Name:</label>
               <input 
@@ -346,12 +371,21 @@ export default function ClientPortal() {
               />
             </div>
 
-            {date && (
+            {/* --- UPDATED: Client MUST select a service before seeing time slots --- */}
+            {date && !selectedService && (
+              <div style={{ padding: '15px', backgroundColor: '#fff', borderLeft: '4px solid #FDE68A', borderRadius: '6px' }}>
+                <p style={{ color: '#92400E', margin: 0, fontWeight: '500' }}>
+                  Please select a healing service above to see available time slots.
+                </p>
+              </div>
+            )}
+
+            {date && selectedService && (
               <div>
                 <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#2c3e50' }}>Choose an Available Time Slot:</label>
                 {timeSlots.length === 0 ? (
                   <p style={{ color: '#D9534F', fontSize: '0.95rem', margin: 0 }}>
-                    There are no available time slots left on this date. Please choose another date.
+                    There is not enough time left on the calendar for this service. Please choose another date.
                   </p>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
