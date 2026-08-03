@@ -57,6 +57,15 @@ export default function ClientPortal() {
     }
   }
 
+  // --- NEW: Create an array of only the days of the week your mom actually works ---
+  const availableDaysOfWeek = availability.map(a => a.day_of_week)
+
+  // --- NEW: This function checks if a given date on the calendar matches an active working day ---
+  const isDaySelectable = (date) => {
+    const day = date.getDay()
+    return availableDaysOfWeek.includes(day)
+  }
+
   const getAvailableTimeSlots = () => {
     if (!date || availability.length === 0) return []
     const dayOfWeek = date.getDay()
@@ -146,7 +155,7 @@ export default function ClientPortal() {
           clientName: user.user_metadata?.full_name || 'Client',
           serviceName: services.find(s => s.id === selectedService)?.name,
           date: formattedDate,
-          time: formatDisplayTime(time) // <-- 12-Hour format applied here!
+          time: formatDisplayTime(time) 
         }
       })
       toast.success('Your session has been successfully requested!')
@@ -191,7 +200,7 @@ export default function ClientPortal() {
           clientName: user.user_metadata?.full_name || 'there',
           serviceName: apt.services?.name ?? 'Healing Session',
           date: apt.appointment_date,
-          time: formatDisplayTime(apt.start_time), // <-- 12-Hour format applied here!
+          time: formatDisplayTime(apt.start_time),
           status: 'cancelled',
         },
       })
@@ -271,6 +280,7 @@ export default function ClientPortal() {
                 onChange={(d) => { setDate(d); setTime(null); }} 
                 minDate={new Date()} 
                 excludeDates={blockedDates} 
+                filterDate={isDaySelectable} // <-- NEW: Passes the array of working days into the calendar!
                 placeholderText="Select your date"
                 dateFormat="MMMM d, yyyy"
                 required
