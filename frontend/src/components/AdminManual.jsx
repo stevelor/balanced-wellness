@@ -3,9 +3,10 @@ import { supabase } from '../supabaseClient'
 import Button from './Button'
 import toast from 'react-hot-toast'
 
-export default function AdminManualBooking() {
+export default function AdminManual() {
   const [services, setServices] = useState([])
   const [selectedService, setSelectedService] = useState('')
+  const [clientName, setClientName] = useState('') // <-- NEW: Collects the name
   const [clientEmail, setClientEmail] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -24,20 +25,19 @@ export default function AdminManualBooking() {
     e.preventDefault()
     setIsSubmitting(true)
 
-    // 1. Get the admin's user ID to satisfy the database requirements
     const { data: { user } } = await supabase.auth.getUser()
 
-    // 2. Insert the forced appointment
     const { error } = await supabase
       .from('appointments')
       .insert([
         {
-          client_id: user.id, // Attaches to admin to prevent database errors
+          client_id: user.id, 
           client_email: clientEmail, 
+          client_name: clientName, // <-- NEW: Saves the manual name to the database
           service_id: selectedService,
           appointment_date: date,
           start_time: time,
-          status: 'confirmed' // Automatically confirmed!
+          status: 'confirmed' 
         }
       ])
 
@@ -49,12 +49,9 @@ export default function AdminManualBooking() {
 
     toast.success('Manual appointment successfully added to the schedule!')
 
-    // 3. Optional: Send the email receipt if an email was provided
     if (clientEmail) {
       try {
         const serviceName = services.find(s => s.id === selectedService)?.name
-        
-        // Format time for the email (12-hour AM/PM)
         const [hourStr, minuteStr] = time.split(':')
         let hour = parseInt(hourStr, 10)
         const ampm = hour >= 12 ? 'PM' : 'AM'
@@ -64,7 +61,7 @@ export default function AdminManualBooking() {
         await supabase.functions.invoke('send-email', {
           body: { 
             clientEmail: clientEmail, 
-            clientName: 'Client', 
+            clientName: clientName || 'Client', // <-- NEW: Uses the name in the email
             serviceName: serviceName,
             date: date,
             time: formattedTime,
@@ -76,14 +73,13 @@ export default function AdminManualBooking() {
       }
     }
 
-    // 4. Reset the form and force a quick page refresh to update the admin table
+    setClientName('')
     setSelectedService('')
     setClientEmail('')
     setDate('')
     setTime('')
     setIsSubmitting(false)
     
-    // Quick refresh to ensure the new appointment pops up in the table below
     setTimeout(() => {
       window.location.reload()
     }, 1500)
@@ -113,7 +109,19 @@ export default function AdminManualBooking() {
           </select>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
+        {/* --- NEW: Client Name Input --- */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 150px' }}>
+          <label style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>Client Name</label>
+          <input 
+            type="text" 
+            placeholder="Jane Doe"
+            value={clientName} 
+            onChange={(e) => setClientName(e.target.value)} 
+            style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '0.95rem' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 150px' }}>
           <label style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>Client Email (Optional)</label>
           <input 
             type="email" 
