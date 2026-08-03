@@ -12,16 +12,48 @@ export default function ClientPortal() {
   const [selectedService, setSelectedService] = useState('')
   const [date, setDate] = useState(null) 
   const [time, setTime] = useState(null) 
+  const [clientName, setClientName] = useState('') // <-- NEW: Stores the client's name
   const [myAppointments, setMyAppointments] = useState([])
+  const [bookedSlots, setBookedSlots] = useState([]) 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cancellingId, setCancellingId] = useState(null)
 
   useEffect(() => {
+    fetchUserAccount() // Fetch the user's saved name
     fetchServices()
     fetchMyAppointments()
     fetchAvailability() 
     fetchBlockedDates()
   }, [])
+
+  // --- NEW: Checks if they have a name saved to their account already ---
+  const fetchUserAccount = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user && user.user_metadata?.full_name) {
+      setClientName(user.user_metadata.full_name)
+    }
+  }
+
+  useEffect(() => {
+    if (date) {
+      const fetchBookedSlotsForDate = async () => {
+        const formattedDate = date.toLocaleDateString('en-CA')
+        const { data, error } = await supabase
+          .from('appointments')
+          .select('start_time, status')
+          .eq('appointment_date', formattedDate)
+          .neq('status', 'cancelled')
+        
+        if (!error && data) {
+          const takenTimes = data.map(apt => apt.start_time.substring(0, 5))
+          setBookedSlots(takenTimes)
+        }
+      }
+      fetchBookedSlotsForDate()
+    } else {
+      setBookedSlots([])
+    }
+  }, [date])
 
   const fetchServices = async () => {
     const { data, error } = await supabase.from('services').select('*')
@@ -57,10 +89,8 @@ export default function ClientPortal() {
     }
   }
 
-  // --- NEW: Create an array of only the days of the week your mom actually works ---
   const availableDaysOfWeek = availability.map(a => a.day_of_week)
 
-  // --- NEW: This function checks if a given date on the calendar matches an active working day ---
   const isDaySelectable = (date) => {
     const day = date.getDay()
     return availableDaysOfWeek.includes(day)
@@ -81,7 +111,11 @@ export default function ClientPortal() {
       while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
         const formattedHour = String(currentHour).padStart(2, '0')
         const formattedMinute = String(currentMinute).padStart(2, '0')
-        slots.push(`${formattedHour}:${formattedMinute}`)
+        const timeString = `${formattedHour}:${formattedMinute}`
+        
+        if (!bookedSlots.includes(timeString)) {
+          slots.push(timeString)
+        }
 
         currentMinute += 30
         if (currentMinute >= 60) {
@@ -104,17 +138,18 @@ export default function ClientPortal() {
   const canCancel = (appointmentDate, startTime) => {
     const [year, month, day] = appointmentDate.split('-').map(Number)
     const [hour, minute] = startTime.substring(0, 5).split(':').map(Number)
-    
     const aptDateTime = new Date(year, month - 1, day, hour, minute)
     const now = new Date()
-    const hoursLeft = (aptDateTime - now) / (1000 * 60 * 60)
-    
-    return hoursLeft >= 24
+    return ((aptDateTime - now) / (1000 * 60 * 60)) >= 24
   }
 
   const handleBooking = async (e) => {
     e.preventDefault()
     
+    if (!clientName.trim()) {
+      toast.error("Please enter your name.")
+      return
+    }
     if (!selectedService) {
       toast.error("Please select a healing service for your session.")
       return
@@ -126,8 +161,10 @@ export default function ClientPortal() {
 
     setIsSubmitting(true)
     const formattedDate = date.toLocaleDateString('en-CA') 
-
     const { data: { user } } = await supabase.auth.getUser()
+
+    // --- NEW: Update the user's account permanently with their name ---
+    await supabase.auth.updateUser({ data: { full_name: clientName } })
 
     const { error } = await supabase
       .from('appointments')
@@ -135,6 +172,7 @@ export default function ClientPortal() {
         {
           client_id: user.id,
           client_email: user.email, 
+          client_name: clientName, // <-- NEW: Saves to the appointment row
           service_id: selectedService,
           appointment_date: formattedDate,
           start_time: time,
@@ -152,7 +190,7 @@ export default function ClientPortal() {
       await supabase.functions.invoke('send-email', {
         body: { 
           clientEmail: user.email, 
-          clientName: user.user_metadata?.full_name || 'Client',
+          clientName: clientName, // <-- NEW: Uses their actual name in the email!
           serviceName: services.find(s => s.id === selectedService)?.name,
           date: formattedDate,
           time: formatDisplayTime(time) 
@@ -197,7 +235,7 @@ export default function ClientPortal() {
       await supabase.functions.invoke('send-email', {
         body: {
           clientEmail: user.email,
-          clientName: user.user_metadata?.full_name || 'there',
+          clientName: clientName || 'there',
           serviceName: apt.services?.name ?? 'Healing Session',
           date: apt.appointment_date,
           time: formatDisplayTime(apt.start_time),
@@ -207,7 +245,6 @@ export default function ClientPortal() {
     } catch (emailErr) {
       console.error('Cancellation email failed:', emailErr)
     }
-
     setCancellingId(null)
   }
 
@@ -247,6 +284,26 @@ export default function ClientPortal() {
 
           <form onSubmit={handleBooking} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
+            {/* --- NEW: Client Name Input --- */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontWeight: '600', color: '#2c3e50' }}>Your Full Name:</label>
+              <input 
+                type="text" 
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="Jane Doe"
+                required
+                disabled={isSubmitting}
+                style={{ 
+                  padding: '12px', 
+                  borderRadius: '6px', 
+                  border: '1px solid #ddd', 
+                  fontSize: '1rem',
+                  fontFamily: 'inherit'
+                }}
+              />
+            </div>
+
             <div>
               <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500' }}>How can we help you heal today?</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
@@ -280,7 +337,7 @@ export default function ClientPortal() {
                 onChange={(d) => { setDate(d); setTime(null); }} 
                 minDate={new Date()} 
                 excludeDates={blockedDates} 
-                filterDate={isDaySelectable} // <-- NEW: Passes the array of working days into the calendar!
+                filterDate={isDaySelectable} 
                 placeholderText="Select your date"
                 dateFormat="MMMM d, yyyy"
                 required
@@ -293,7 +350,9 @@ export default function ClientPortal() {
               <div>
                 <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#2c3e50' }}>Choose an Available Time Slot:</label>
                 {timeSlots.length === 0 ? (
-                  <p style={{ color: '#D9534F', fontSize: '0.95rem', margin: 0 }}>We are closed on this day of the week or this date is blocked. Please choose another date.</p>
+                  <p style={{ color: '#D9534F', fontSize: '0.95rem', margin: 0 }}>
+                    There are no available time slots left on this date. Please choose another date.
+                  </p>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
                     {timeSlots.map(slot => (
