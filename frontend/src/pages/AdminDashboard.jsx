@@ -5,13 +5,13 @@ import Navbar from '../components/Navbar'
 import AdminVitals from '../components/AdminVitals'
 import AdminManual from '../components/AdminManual'
 import AdminAppointments from '../components/AdminAppointments'
+import BlockedDatesManager from '../components/BlockedDatesManager'
 import AvailabilityManager from '../components/AvailabilityManager'
-import BlockedDatesManager from '../components/BlockedDatesManager' // <-- NEW IMPORT
+import ServiceListItem from '../components/ServiceListItem' // <-- Adjusted Import
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
 
-  // Ensure only logged-in users can see this page
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -47,12 +47,17 @@ export default function AdminDashboard() {
           <AdminManual />
         </div>
 
-        {/* --- 4. The Blocked Dates Manager (NEW!) --- */}
+        {/* --- 4. The Blocked Dates Manager --- */}
         <div style={{ marginTop: '30px' }}>
           <BlockedDatesManager />
         </div>
 
-        {/* --- 5. The Weekly Hours Manager --- */}
+        {/* --- 5. The Services Manager (Using ServiceListItem) --- */}
+        <div style={{ marginTop: '30px' }}>
+          <ServiceListItem />
+        </div>
+
+        {/* --- 6. The Weekly Hours Manager --- */}
         <div style={{ marginTop: '30px' }}>
           <AvailabilityManager />
         </div>
