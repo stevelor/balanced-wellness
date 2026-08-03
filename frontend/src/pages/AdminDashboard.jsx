@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useSupabaseTable } from '../hooks/useSupabaseTable'
-import Card from './Card'
-import Button from './Button'
-import StatusBadge from './StatusBadge'
+import Card from "../components/Card";
+import Button from "../components/Button";
+import StatusBadge from "../components/StatusBadge";
 import toast from 'react-hot-toast' 
 
 export default function AdminAppointments() {
