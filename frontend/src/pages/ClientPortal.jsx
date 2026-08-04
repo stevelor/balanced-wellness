@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 
 export default function ClientPortal() {
   const [services, setServices] = useState([])
+  const [events, setEvents] = useState([]) // <-- NEW: Stores upcoming events
   const [availability, setAvailability] = useState([]) 
   const [blockedDates, setBlockedDates] = useState([]) 
   const [selectedService, setSelectedService] = useState('')
@@ -14,16 +15,14 @@ export default function ClientPortal() {
   const [time, setTime] = useState(null) 
   const [clientName, setClientName] = useState('') 
   const [myAppointments, setMyAppointments] = useState([])
-  
-  // --- UPDATED: Now stores both start time AND end time for overlaps ---
   const [bookedAppointments, setBookedAppointments] = useState([]) 
-  
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cancellingId, setCancellingId] = useState(null)
 
   useEffect(() => {
     fetchUserAccount() 
     fetchServices()
+    fetchEvents() // <-- NEW
     fetchMyAppointments()
     fetchAvailability() 
     fetchBlockedDates()
@@ -36,7 +35,18 @@ export default function ClientPortal() {
     }
   }
 
-  // --- UPDATED: Fetches appointments AND their durations for accurate overlap math ---
+  // --- NEW: Fetch Upcoming Events ---
+  const fetchEvents = async () => {
+    const today = new Date().toLocaleDateString('en-CA')
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, event_registrations(id, client_id)')
+      .gte('event_date', today)
+      .order('event_date', { ascending: true })
+    
+    if (!error && data) setEvents(data)
+  }
+
   useEffect(() => {
     if (date) {
       const fetchBookedSlotsForDate = async () => {
@@ -104,7 +114,6 @@ export default function ClientPortal() {
     return availableDaysOfWeek.includes(day)
   }
 
-  // --- UPDATED: The Overlap Engine ---
   const getAvailableTimeSlots = () => {
     if (!date || !selectedService || availability.length === 0) return []
     
@@ -131,15 +140,11 @@ export default function ClientPortal() {
         const formattedMinute = String(currentMinute).padStart(2, '0')
         const timeString = `${formattedHour}:${formattedMinute}`
 
-        // 1. Check if the proposed appointment would push past the admin's closing time
         const fitsInWorkingHours = slotEndMins <= ruleEndMins
-
-        // 2. Check if the proposed appointment overlaps with any existing booked appointments
         const isOverlapping = bookedAppointments.some(bookedApt => {
           return (slotStartMins < bookedApt.endMins) && (slotEndMins > bookedApt.startMins)
         })
 
-        // If it finishes before closing time AND doesn't overlap anyone else, we show it!
         if (fitsInWorkingHours && !isOverlapping) {
           slots.push(timeString)
         }
@@ -168,6 +173,59 @@ export default function ClientPortal() {
     const aptDateTime = new Date(year, month - 1, day, hour, minute)
     const now = new Date()
     return ((aptDateTime - now) / (1000 * 60 * 60)) >= 24
+  }
+
+  // --- NEW: Event Registration Handler ---
+  const handleRegisterEvent = async (event) => {
+    if (!clientName.trim()) {
+      toast.error("Please enter your Full Name in the booking form below before registering for an event.")
+      return
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    // Check if they already registered
+    const alreadyRegistered = event.event_registrations?.some(reg => reg.client_id === user.id)
+    if (alreadyRegistered) {
+      toast.error("You are already registered for this event!")
+      return
+    }
+
+    // Check if it's full
+    if (event.event_registrations?.length >= event.total_spots) {
+      toast.error("Sorry, this event is completely full.")
+      return
+    }
+
+    const { error } = await supabase.from('event_registrations').insert([
+      {
+        event_id: event.id,
+        client_id: user.id,
+        client_name: clientName,
+        client_email: user.email
+      }
+    ])
+
+    if (error) {
+      toast.error(`Registration failed: ${error.message}`)
+    } else {
+      // Payment instructions popup since she takes manual payments
+      toast.success(
+        (t) => (
+          <div>
+            <strong>Spot Secured! 🎉</strong>
+            <p style={{ margin: '5px 0' }}>Your registration for {event.title} is confirmed.</p>
+            <p style={{ margin: '5px 0', fontSize: '0.9rem' }}>
+              Please finalize your spot by submitting your payment of <strong>${event.price}</strong> via:<br/><br/>
+              • <strong>Venmo:</strong> @DonnaLorence<br/>
+              • <strong>Zelle:</strong> 845-642-7262
+            </p>
+          </div>
+        ),
+        { duration: 10000 }
+      )
+      fetchEvents() // Refresh capacities
+    }
   }
 
   const handleBooking = async (e) => {
@@ -219,7 +277,10 @@ export default function ClientPortal() {
           clientName: clientName, 
           serviceName: services.find(s => s.id === selectedService)?.name,
           date: formattedDate,
-          time: formatDisplayTime(time) 
+          time: formatDisplayTime(time),
+          duration: services.find(s => s.id === selectedService)?.duration_minutes || 60,
+          price: services.find(s => s.id === selectedService)?.price || 0,
+          status: 'pending'
         }
       })
       toast.success('Your session has been successfully requested!')
@@ -290,12 +351,7 @@ export default function ClientPortal() {
           marginBottom: '30px',
           boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
         }}>
-          <svg 
-            width="36" height="36" viewBox="0 0 24 24" 
-            fill="none" stroke="#899E8B" strokeWidth="1.5" 
-            strokeLinecap="round" strokeLinejoin="round" 
-            style={{ marginBottom: '10px' }}
-          >
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#899E8B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '10px' }}>
             <path d="M12 2a10 10 0 0 1 7.54 16.6l-1.08-1.08A8 8 0 1 0 12 20v2a10 10 0 0 1 0-20z"></path>
             <path d="M12 6v6l4 2"></path>
           </svg>
@@ -305,8 +361,65 @@ export default function ClientPortal() {
           </p>
         </div>
 
+        {/* --- NEW: Upcoming Events Section --- */}
+        {events.length > 0 && (
+          <div style={{ marginBottom: '40px' }}>
+            <h3 style={{ borderBottom: '2px solid #899E8B', paddingBottom: '10px', display: 'inline-block', marginBottom: '20px' }}>
+              ✨ Upcoming Special Events
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+              {events.map(ev => {
+                const registeredCount = ev.event_registrations?.length || 0;
+                const isFull = registeredCount >= ev.total_spots;
+
+                return (
+                  <div key={ev.id} style={{ backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                    {ev.image_url && (
+                      <div style={{ height: '140px', backgroundImage: `url(${ev.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    )}
+                    <div style={{ padding: '20px' }}>
+                      <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50', fontSize: '1.2rem' }}>{ev.title}</h4>
+                      <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '0.95rem' }}>
+                        📅 {new Date(`${ev.event_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}<br/>
+                        ⏰ {formatDisplayTime(ev.start_time)}<br/>
+                        🎟️ {ev.total_spots - registeredCount} spots remaining
+                      </p>
+                      
+                      {ev.description && (
+                        <p style={{ fontSize: '0.9rem', color: '#555', marginBottom: '15px' }}>{ev.description}</p>
+                      )}
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
+                        <strong style={{ fontSize: '1.2rem', color: '#899E8B' }}>${ev.price}</strong>
+                        <button 
+                          onClick={() => handleRegisterEvent(ev)}
+                          disabled={isFull}
+                          style={{
+                            padding: '10px 20px',
+                            backgroundColor: isFull ? '#ccc' : '#899E8B',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: isFull ? 'not-allowed' : 'pointer',
+                            fontWeight: '600'
+                          }}
+                        >
+                          {isFull ? 'Sold Out' : 'Secure My Spot'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <div style={{ backgroundColor: '#F4F1EA', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
-          <h3>Book Your Session</h3>
+          <h3 style={{ borderBottom: '2px solid #899E8B', paddingBottom: '10px', display: 'inline-block', marginBottom: '20px' }}>
+            Book a 1-on-1 Session
+          </h3>
 
           <form onSubmit={handleBooking} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
@@ -319,13 +432,7 @@ export default function ClientPortal() {
                 placeholder="Jane Doe"
                 required
                 disabled={isSubmitting}
-                style={{ 
-                  padding: '12px', 
-                  borderRadius: '6px', 
-                  border: '1px solid #ddd', 
-                  fontSize: '1rem',
-                  fontFamily: 'inherit'
-                }}
+                style={{ padding: '12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '1rem', fontFamily: 'inherit' }}
               />
             </div>
 
@@ -371,7 +478,6 @@ export default function ClientPortal() {
               />
             </div>
 
-            {/* --- UPDATED: Client MUST select a service before seeing time slots --- */}
             {date && !selectedService && (
               <div style={{ padding: '15px', backgroundColor: '#fff', borderLeft: '4px solid #FDE68A', borderRadius: '6px' }}>
                 <p style={{ color: '#92400E', margin: 0, fontWeight: '500' }}>
@@ -418,19 +524,7 @@ export default function ClientPortal() {
             <button 
               type="submit" 
               disabled={isSubmitting}
-              style={{ 
-                padding: '14px', 
-                backgroundColor: isSubmitting ? '#aebfad' : '#899E8B', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '8px', 
-                cursor: isSubmitting ? 'not-allowed' : 'pointer', 
-                fontWeight: 'bold', 
-                fontSize: '1.05rem', 
-                transition: 'background-color 0.3s ease', 
-                marginTop: '10px', 
-                boxShadow: '0 4px 6px rgba(137, 158, 139, 0.2)' 
-              }}
+              style={{ padding: '14px', backgroundColor: isSubmitting ? '#aebfad' : '#899E8B', color: 'white', border: 'none', borderRadius: '8px', cursor: isSubmitting ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '1.05rem', marginTop: '10px' }}
             >
               {isSubmitting ? 'Reserving...' : 'Reserve My Time'}
             </button>
@@ -438,7 +532,7 @@ export default function ClientPortal() {
         </div>
 
         <div>
-          <h3>Your Upcoming Sessions</h3>
+          <h3>Your Upcoming 1-on-1 Sessions</h3>
           {myAppointments.length === 0 ? (
             <p style={{ color: '#666' }}>You have no upcoming sessions at this time.</p>
           ) : (
@@ -446,7 +540,7 @@ export default function ClientPortal() {
               {myAppointments.map((apt) => {
                 const isWithin24Hours = !canCancel(apt.appointment_date, apt.start_time)
                 return (
-                  <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                     <div>
                       <strong style={{ fontSize: '1.1em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
                       <span style={{ color: '#666', display: 'block', margin: '5px 0' }}>Date: {apt.appointment_date} at {formatDisplayTime(apt.start_time)}</span>
@@ -457,26 +551,9 @@ export default function ClientPortal() {
 
                     {(apt.status === 'pending' || apt.status === 'confirmed') && (
                       isWithin24Hours ? (
-                        <span style={{ fontSize: '0.85rem', color: '#888', fontStyle: 'italic' }}>
-                          Cannot cancel within 24h
-                        </span>
+                        <span style={{ fontSize: '0.85rem', color: '#888', fontStyle: 'italic' }}>Cannot cancel within 24h</span>
                       ) : (
-                        <button
-                          type="button"
-                          disabled={cancellingId === apt.id}
-                          onClick={() => handleCancelAppointment(apt)}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#fff',
-                            color: '#D9534F',
-                            border: '1px solid #D9534F',
-                            borderRadius: '6px',
-                            cursor: cancellingId === apt.id ? 'not-allowed' : 'pointer',
-                            fontSize: '0.85rem',
-                            fontWeight: '500',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
+                        <button type="button" disabled={cancellingId === apt.id} onClick={() => handleCancelAppointment(apt)} style={{ padding: '6px 12px', backgroundColor: '#fff', color: '#D9534F', border: '1px solid #D9534F', borderRadius: '6px', cursor: cancellingId === apt.id ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: '500' }}>
                           {cancellingId === apt.id ? 'Cancelling...' : 'Cancel Appointment'}
                         </button>
                       )
