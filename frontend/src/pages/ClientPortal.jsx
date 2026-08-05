@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 
 export default function ClientPortal() {
   const [services, setServices] = useState([])
-  const [events, setEvents] = useState([]) // <-- NEW: Stores upcoming events
+  const [events, setEvents] = useState([]) 
   const [availability, setAvailability] = useState([]) 
   const [blockedDates, setBlockedDates] = useState([]) 
   const [selectedService, setSelectedService] = useState('')
@@ -22,7 +22,7 @@ export default function ClientPortal() {
   useEffect(() => {
     fetchUserAccount() 
     fetchServices()
-    fetchEvents() // <-- NEW
+    fetchEvents() 
     fetchMyAppointments()
     fetchAvailability() 
     fetchBlockedDates()
@@ -35,7 +35,6 @@ export default function ClientPortal() {
     }
   }
 
-  // --- NEW: Fetch Upcoming Events ---
   const fetchEvents = async () => {
     const today = new Date().toLocaleDateString('en-CA')
     const { data, error } = await supabase
@@ -175,7 +174,6 @@ export default function ClientPortal() {
     return ((aptDateTime - now) / (1000 * 60 * 60)) >= 24
   }
 
-  // --- NEW: Event Registration Handler ---
   const handleRegisterEvent = async (event) => {
     if (!clientName.trim()) {
       toast.error("Please enter your Full Name in the booking form below before registering for an event.")
@@ -184,14 +182,12 @@ export default function ClientPortal() {
 
     const { data: { user } } = await supabase.auth.getUser()
     
-    // Check if they already registered
     const alreadyRegistered = event.event_registrations?.some(reg => reg.client_id === user.id)
     if (alreadyRegistered) {
       toast.error("You are already registered for this event!")
       return
     }
 
-    // Check if it's full
     if (event.event_registrations?.length >= event.total_spots) {
       toast.error("Sorry, this event is completely full.")
       return
@@ -209,7 +205,6 @@ export default function ClientPortal() {
     if (error) {
       toast.error(`Registration failed: ${error.message}`)
     } else {
-      // Payment instructions popup since she takes manual payments
       toast.success(
         (t) => (
           <div>
@@ -224,7 +219,7 @@ export default function ClientPortal() {
         ),
         { duration: 10000 }
       )
-      fetchEvents() // Refresh capacities
+      fetchEvents() 
     }
   }
 
@@ -341,228 +336,262 @@ export default function ClientPortal() {
     <>
       <Navbar />
       
-      <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px' }}>
-        
-        <div style={{ 
-          backgroundColor: '#F4F1EA', 
-          padding: '30px 20px', 
-          borderRadius: '12px', 
-          textAlign: 'center', 
-          marginBottom: '30px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-        }}>
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#899E8B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '10px' }}>
-            <path d="M12 2a10 10 0 0 1 7.54 16.6l-1.08-1.08A8 8 0 1 0 12 20v2a10 10 0 0 1 0-20z"></path>
-            <path d="M12 6v6l4 2"></path>
-          </svg>
-          <h2 style={{ color: '#2c3e50', margin: '0 0 8px 0', fontSize: '1.6rem', fontWeight: '500' }}>Welcome to Your Sanctuary</h2>
-          <p style={{ color: '#666', margin: 0, fontSize: '1.05rem', fontStyle: 'italic' }}>
-            "Take a deep breath and carve out some time for your well-being."
-          </p>
-        </div>
+      {/* --- ADDED MOBILE PADDING & WIDTH LIMITS --- */}
+      <div style={{ maxWidth: '100%', width: '100%', padding: '15px', boxSizing: 'border-box' }}>
+        <div style={{ maxWidth: '700px', margin: '20px auto 40px auto' }}>
+          
+          <div style={{ 
+            backgroundColor: '#F4F1EA', 
+            padding: '25px 15px', 
+            borderRadius: '12px', 
+            textAlign: 'center', 
+            marginBottom: '30px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+          }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#899E8B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '10px' }}>
+              <path d="M12 2a10 10 0 0 1 7.54 16.6l-1.08-1.08A8 8 0 1 0 12 20v2a10 10 0 0 1 0-20z"></path>
+              <path d="M12 6v6l4 2"></path>
+            </svg>
+            <h2 style={{ color: '#2c3e50', margin: '0 0 8px 0', fontSize: '1.4rem', fontWeight: '500' }}>Welcome to Your Sanctuary</h2>
+            <p style={{ color: '#666', margin: 0, fontSize: '1rem', fontStyle: 'italic' }}>
+              "Take a deep breath and carve out some time for your well-being."
+            </p>
+          </div>
 
-        {/* --- NEW: Upcoming Events Section --- */}
-        {events.length > 0 && (
-          <div style={{ marginBottom: '40px' }}>
-            <h3 style={{ borderBottom: '2px solid #899E8B', paddingBottom: '10px', display: 'inline-block', marginBottom: '20px' }}>
-              ✨ Upcoming Special Events
-            </h3>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-              {events.map(ev => {
-                const registeredCount = ev.event_registrations?.length || 0;
-                const isFull = registeredCount >= ev.total_spots;
+          {events.length > 0 && (
+            <div style={{ marginBottom: '40px' }}>
+              <h3 style={{ borderBottom: '2px solid #899E8B', paddingBottom: '8px', display: 'inline-block', marginBottom: '20px', fontSize: '1.2rem' }}>
+                ✨ Upcoming Special Events
+              </h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
+                {events.map(ev => {
+                  const registeredCount = ev.event_registrations?.length || 0;
+                  const isFull = registeredCount >= ev.total_spots;
 
-                return (
-                  <div key={ev.id} style={{ backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                    {ev.image_url && (
-                      <div style={{ height: '140px', backgroundImage: `url(${ev.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                    )}
-                    <div style={{ padding: '20px' }}>
-                      <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50', fontSize: '1.2rem' }}>{ev.title}</h4>
-                      <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '0.95rem' }}>
-                        📅 {new Date(`${ev.event_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}<br/>
-                        ⏰ {formatDisplayTime(ev.start_time)}<br/>
-                        🎟️ {ev.total_spots - registeredCount} spots remaining
-                      </p>
-                      
-                      {ev.description && (
-                        <p style={{ fontSize: '0.9rem', color: '#555', marginBottom: '15px' }}>{ev.description}</p>
+                  return (
+                    <div key={ev.id} style={{ backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                      {ev.image_url && (
+                        <div style={{ height: '140px', backgroundImage: `url(${ev.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
                       )}
-                      
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
-                        <strong style={{ fontSize: '1.2rem', color: '#899E8B' }}>${ev.price}</strong>
-                        <button 
-                          onClick={() => handleRegisterEvent(ev)}
-                          disabled={isFull}
-                          style={{
-                            padding: '10px 20px',
-                            backgroundColor: isFull ? '#ccc' : '#899E8B',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: isFull ? 'not-allowed' : 'pointer',
-                            fontWeight: '600'
-                          }}
-                        >
-                          {isFull ? 'Sold Out' : 'Secure My Spot'}
-                        </button>
+                      <div style={{ padding: '20px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50', fontSize: '1.2rem' }}>{ev.title}</h4>
+                        <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '0.95rem' }}>
+                          📅 {new Date(`${ev.event_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}<br/>
+                          ⏰ {formatDisplayTime(ev.start_time)}<br/>
+                          🎟️ {ev.total_spots - registeredCount} spots remaining
+                        </p>
+                        
+                        {ev.description && (
+                          <p style={{ fontSize: '0.9rem', color: '#555', marginBottom: '15px' }}>{ev.description}</p>
+                        )}
+                        
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
+                          <strong style={{ fontSize: '1.2rem', color: '#899E8B' }}>${ev.price}</strong>
+                          <button 
+                            onClick={() => handleRegisterEvent(ev)}
+                            disabled={isFull}
+                            style={{
+                              padding: '10px 15px',
+                              backgroundColor: isFull ? '#ccc' : '#899E8B',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: isFull ? 'not-allowed' : 'pointer',
+                              fontWeight: '600',
+                              fontSize: '0.9rem'
+                            }}
+                          >
+                            {isFull ? 'Sold Out' : 'Secure My Spot'}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        <div style={{ backgroundColor: '#F4F1EA', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
-          <h3 style={{ borderBottom: '2px solid #899E8B', paddingBottom: '10px', display: 'inline-block', marginBottom: '20px' }}>
-            Book a 1-on-1 Session
-          </h3>
-
-          <form onSubmit={handleBooking} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontWeight: '600', color: '#2c3e50' }}>Your Full Name:</label>
-              <input 
-                type="text" 
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                placeholder="Jane Doe"
-                required
-                disabled={isSubmitting}
-                style={{ padding: '12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '1rem', fontFamily: 'inherit' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500' }}>How can we help you heal today?</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-                {services.map(service => (
-                  <div 
-                    key={service.id}
-                    onClick={() => !isSubmitting && setSelectedService(service.id)}
-                    style={{
-                      padding: '15px',
-                      border: selectedService === service.id ? '2px solid #899E8B' : '1px solid #ddd',
-                      borderRadius: '8px',
-                      backgroundColor: selectedService === service.id ? '#e9efe9' : '#fff',
-                      cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.2s ease',
-                      boxShadow: selectedService === service.id ? '0 4px 8px rgba(0,0,0,0.05)' : 'none',
-                      opacity: isSubmitting ? 0.6 : 1,
-                    }}
-                  >
-                    <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50', fontSize: '1.1em' }}>{service.name}</h4>
-                    <p style={{ margin: '0 0 5px 0', fontSize: '0.9em', color: '#666' }}>{service.duration_minutes} minutes</p>
-                    <p style={{ margin: '0', fontWeight: 'bold', color: '#899E8B' }}>${Number(service.price).toFixed(2)}</p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontWeight: '600', color: '#2c3e50' }}>Choose a Date:</label>
-              <DatePicker 
-                selected={date} 
-                onChange={(d) => { setDate(d); setTime(null); }} 
-                minDate={new Date()} 
-                excludeDates={blockedDates} 
-                filterDate={isDaySelectable} 
-                placeholderText="Select your date"
-                dateFormat="MMMM d, yyyy"
-                required
-                disabled={isSubmitting}
-                wrapperClassName="date-picker-wrapper"
-              />
-            </div>
-
-            {date && !selectedService && (
-              <div style={{ padding: '15px', backgroundColor: '#fff', borderLeft: '4px solid #FDE68A', borderRadius: '6px' }}>
-                <p style={{ color: '#92400E', margin: 0, fontWeight: '500' }}>
-                  Please select a healing service above to see available time slots.
-                </p>
-              </div>
-            )}
-
-            {date && selectedService && (
-              <div>
-                <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#2c3e50' }}>Choose an Available Time Slot:</label>
-                {timeSlots.length === 0 ? (
-                  <p style={{ color: '#D9534F', fontSize: '0.95rem', margin: 0 }}>
-                    There is not enough time left on the calendar for this service. Please choose another date.
-                  </p>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
-                    {timeSlots.map(slot => (
-                      <button
-                        key={slot}
-                        type="button"
-                        onClick={() => setTime(slot)}
-                        style={{
-                          padding: '10px 12px',
-                          borderRadius: '6px',
-                          border: time === slot ? '2px solid #899E8B' : '1px solid #ddd',
-                          backgroundColor: time === slot ? '#899E8B' : '#fff',
-                          color: time === slot ? '#fff' : '#2c3e50',
-                          fontWeight: time === slot ? 'bold' : 'normal',
-                          cursor: 'pointer',
-                          fontSize: '0.95rem',
-                          textAlign: 'center',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        {formatDisplayTime(slot)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            
-            <button 
-              type="submit" 
-              disabled={isSubmitting}
-              style={{ padding: '14px', backgroundColor: isSubmitting ? '#aebfad' : '#899E8B', color: 'white', border: 'none', borderRadius: '8px', cursor: isSubmitting ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '1.05rem', marginTop: '10px' }}
-            >
-              {isSubmitting ? 'Reserving...' : 'Reserve My Time'}
-            </button>
-          </form>
-        </div>
-
-        <div>
-          <h3>Your Upcoming 1-on-1 Sessions</h3>
-          {myAppointments.length === 0 ? (
-            <p style={{ color: '#666' }}>You have no upcoming sessions at this time.</p>
-          ) : (
-            <ul style={{ listStyleType: 'none', padding: 0 }}>
-              {myAppointments.map((apt) => {
-                const isWithin24Hours = !canCancel(apt.appointment_date, apt.start_time)
-                return (
-                  <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                    <div>
-                      <strong style={{ fontSize: '1.1em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
-                      <span style={{ color: '#666', display: 'block', margin: '5px 0' }}>Date: {apt.appointment_date} at {formatDisplayTime(apt.start_time)}</span>
-                      <span style={{ display: 'inline-block', marginTop: '5px', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', fontWeight: '500', backgroundColor: apt.status === 'pending' ? '#FDE68A' : apt.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2', color: apt.status === 'pending' ? '#92400E' : apt.status === 'confirmed' ? '#065F46' : '#991B1B' }}>
-                        {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
-                      </span>
-                    </div>
-
-                    {(apt.status === 'pending' || apt.status === 'confirmed') && (
-                      isWithin24Hours ? (
-                        <span style={{ fontSize: '0.85rem', color: '#888', fontStyle: 'italic' }}>Cannot cancel within 24h</span>
-                      ) : (
-                        <button type="button" disabled={cancellingId === apt.id} onClick={() => handleCancelAppointment(apt)} style={{ padding: '6px 12px', backgroundColor: '#fff', color: '#D9534F', border: '1px solid #D9534F', borderRadius: '6px', cursor: cancellingId === apt.id ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: '500' }}>
-                          {cancellingId === apt.id ? 'Cancelling...' : 'Cancel Appointment'}
-                        </button>
-                      )
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
           )}
+
+          <div style={{ backgroundColor: '#F4F1EA', padding: '20px 15px', borderRadius: '8px', marginBottom: '30px' }}>
+            <h3 style={{ borderBottom: '2px solid #899E8B', paddingBottom: '8px', display: 'inline-block', marginBottom: '20px', fontSize: '1.2rem' }}>
+              Book a 1-on-1 Session
+            </h3>
+
+            <form onSubmit={handleBooking} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontWeight: '600', color: '#2c3e50', fontSize: '0.95rem' }}>Your Full Name:</label>
+                <input 
+                  type="text" 
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="Jane Doe"
+                  required
+                  disabled={isSubmitting}
+                  style={{ padding: '12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '16px', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500', color: '#2c3e50', fontSize: '0.95rem' }}>How can we help you heal today?</label>
+                <div className="services-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                  {services.map(service => (
+                    <div 
+                      key={service.id}
+                      onClick={() => !isSubmitting && setSelectedService(service.id)}
+                      style={{
+                        padding: '15px',
+                        border: selectedService === service.id ? '2px solid #899E8B' : '1px solid #ddd',
+                        borderRadius: '8px',
+                        backgroundColor: selectedService === service.id ? '#e9efe9' : '#fff',
+                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: selectedService === service.id ? '0 4px 8px rgba(0,0,0,0.05)' : 'none',
+                        opacity: isSubmitting ? 0.6 : 1,
+                      }}
+                    >
+                      <h4 style={{ margin: '0 0 5px 0', color: '#2c3e50', fontSize: '1rem' }}>{service.name}</h4>
+                      <p style={{ margin: '0 0 5px 0', fontSize: '0.85em', color: '#666' }}>{service.duration_minutes} minutes</p>
+                      <p style={{ margin: '0', fontWeight: 'bold', color: '#899E8B', fontSize: '0.95rem' }}>${Number(service.price).toFixed(2)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontWeight: '600', color: '#2c3e50', fontSize: '0.95rem' }}>Choose a Date:</label>
+                <div style={{ width: '100%' }}>
+                  <DatePicker 
+                    selected={date} 
+                    onChange={(d) => { setDate(d); setTime(null); }} 
+                    minDate={new Date()} 
+                    excludeDates={blockedDates} 
+                    filterDate={isDaySelectable} 
+                    placeholderText="Select your date"
+                    dateFormat="MMMM d, yyyy"
+                    required
+                    disabled={isSubmitting}
+                    wrapperClassName="date-picker-wrapper"
+                  />
+                </div>
+              </div>
+
+              {date && !selectedService && (
+                <div style={{ padding: '12px', backgroundColor: '#fff', borderLeft: '4px solid #FDE68A', borderRadius: '6px' }}>
+                  <p style={{ color: '#92400E', margin: 0, fontWeight: '500', fontSize: '0.9rem' }}>
+                    Please select a healing service above to see available time slots.
+                  </p>
+                </div>
+              )}
+
+              {date && selectedService && (
+                <div>
+                  <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#2c3e50', fontSize: '0.95rem' }}>Choose an Available Time Slot:</label>
+                  {timeSlots.length === 0 ? (
+                    <p style={{ color: '#D9534F', fontSize: '0.9rem', margin: 0 }}>
+                      There is not enough time left on the calendar for this service. Please choose another date.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' }}>
+                      {timeSlots.map(slot => (
+                        <button
+                          key={slot}
+                          type="button"
+                          onClick={() => setTime(slot)}
+                          style={{
+                            padding: '12px 10px',
+                            borderRadius: '6px',
+                            border: time === slot ? '2px solid #899E8B' : '1px solid #ddd',
+                            backgroundColor: time === slot ? '#899E8B' : '#fff',
+                            color: time === slot ? '#fff' : '#2c3e50',
+                            fontWeight: time === slot ? 'bold' : 'normal',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            textAlign: 'center',
+                            width: '100%'
+                          }}
+                        >
+                          {formatDisplayTime(slot)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                style={{ 
+                  padding: '16px', 
+                  backgroundColor: isSubmitting ? '#aebfad' : '#899E8B', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer', 
+                  fontWeight: 'bold', 
+                  fontSize: '1.05rem', 
+                  marginTop: '10px',
+                  width: '100%' 
+                }}
+              >
+                {isSubmitting ? 'Reserving...' : 'Reserve My Time'}
+              </button>
+            </form>
+          </div>
+
+          <div>
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '15px' }}>Your Upcoming 1-on-1 Sessions</h3>
+            {myAppointments.length === 0 ? (
+              <p style={{ color: '#666', fontSize: '0.95rem' }}>You have no upcoming sessions at this time.</p>
+            ) : (
+              <ul style={{ listStyleType: 'none', padding: 0 }}>
+                {myAppointments.map((apt) => {
+                  const isWithin24Hours = !canCancel(apt.appointment_date, apt.start_time)
+                  return (
+                    <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div>
+                        <strong style={{ fontSize: '1.05em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
+                        <span style={{ color: '#666', display: 'block', margin: '5px 0', fontSize: '0.9rem' }}>Date: {apt.appointment_date} at {formatDisplayTime(apt.start_time)}</span>
+                        <span style={{ display: 'inline-block', marginTop: '5px', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', fontWeight: '500', backgroundColor: apt.status === 'pending' ? '#FDE68A' : apt.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2', color: apt.status === 'pending' ? '#92400E' : apt.status === 'confirmed' ? '#065F46' : '#991B1B' }}>
+                          {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
+                        </span>
+                      </div>
+
+                      {(apt.status === 'pending' || apt.status === 'confirmed') && (
+                        isWithin24Hours ? (
+                          <span style={{ fontSize: '0.85rem', color: '#888', fontStyle: 'italic' }}>
+                            Cannot cancel within 24h
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={cancellingId === apt.id}
+                            onClick={() => handleCancelAppointment(apt)}
+                            style={{
+                              padding: '10px',
+                              backgroundColor: '#fff',
+                              color: '#D9534F',
+                              border: '1px solid #D9534F',
+                              borderRadius: '6px',
+                              cursor: cancellingId === apt.id ? 'not-allowed' : 'pointer',
+                              fontSize: '0.9rem',
+                              fontWeight: '500',
+                              width: '100%',
+                              textAlign: 'center'
+                            }}
+                          >
+                            {cancellingId === apt.id ? 'Cancelling...' : 'Cancel Appointment'}
+                          </button>
+                        )
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </>

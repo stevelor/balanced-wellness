@@ -43,3 +43,44 @@ input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none;
 }
+
+/* =========================================
+   MOBILE RESPONSIVENESS & TOUCH FIXES
+========================================= */
+
+/* 1. Prevent the page from accidentally scrolling side-to-side on phones */
+body {
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent; /* Removes the blue flash when tapping on mobile */
+}
+
+/* 2. Stop iPhones from automatically zooming in when clicking a text box */
+input, select, textarea {
+  font-size: 16px !important; 
+}
+
+/* 3. Make sure the Date Picker stretches full width on small screens */
+.react-datepicker-wrapper,
+.react-datepicker__input-container {
+  width: 100%;
+  display: block;
+}
+
+.react-datepicker__input-container input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 4. Enable buttery-smooth sideways scrolling for the Admin Tables on iOS */
+.data-table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; 
+}
+
+/* 5. Mobile Adjustments for smaller screens */
+@media (max-width: 600px) {
+  /* Make the grid items stack top-to-bottom on phones */
+  .services-grid {
+    grid-template-columns: 1fr !important; 
+  }
+}
