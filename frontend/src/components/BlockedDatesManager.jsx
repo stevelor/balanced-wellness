@@ -5,7 +5,8 @@ import toast from 'react-hot-toast'
 
 export default function BlockedDatesManager() {
   const [blockedDates, setBlockedDates] = useState([])
-  const [selectedDate, setSelectedDate] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('') // <-- NEW: End Date state
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -32,31 +33,61 @@ export default function BlockedDatesManager() {
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })
   }
 
-  const handleAddBlockedDate = async (e) => {
+  const handleAddBlockedDates = async (e) => {
     e.preventDefault()
-    if (!selectedDate) return
+    if (!startDate) return
 
     setIsSubmitting(true)
 
-    // Check if the date is already blocked to prevent duplicates
-    const alreadyBlocked = blockedDates.find(b => b.date === selectedDate)
-    if (alreadyBlocked) {
-      toast.error("This date is already blocked.")
+    // If no end date is selected, just use the start date (blocking a single day)
+    const end = endDate || startDate
+
+    // Check if the user accidentally put an end date before the start date
+    if (new Date(end + 'T00:00:00') < new Date(startDate + 'T00:00:00')) {
+      toast.error("The End Date cannot be before the Start Date.")
       setIsSubmitting(false)
       return
     }
 
+    // 1. Generate an array of all dates between Start and End
+    const datesToBlock = []
+    let curr = new Date(startDate + 'T12:00:00') // Using noon to avoid timezone skipping bugs
+    const last = new Date(end + 'T12:00:00')
+
+    while (curr <= last) {
+      const y = curr.getFullYear()
+      const m = String(curr.getMonth() + 1).padStart(2, '0')
+      const d = String(curr.getDate()).padStart(2, '0')
+      datesToBlock.push(`${y}-${m}-${d}`)
+      curr.setDate(curr.getDate() + 1) // Move to the next day
+    }
+
+    // 2. Filter out dates that are already blocked in the database to prevent errors
+    const existingDates = blockedDates.map(b => b.date)
+    const newDatesToInsert = datesToBlock
+      .filter(d => !existingDates.includes(d))
+      .map(d => ({ date: d })) // Format for Supabase bulk insert
+
+    if (newDatesToInsert.length === 0) {
+      toast.error("All of the selected dates are already blocked.")
+      setIsSubmitting(false)
+      return
+    }
+
+    // 3. Insert all new dates into the database at the same time
     const { error } = await supabase
       .from('blocked_dates')
-      .insert([{ date: selectedDate }])
+      .insert(newDatesToInsert)
 
     if (error) {
-      toast.error(`Error blocking date: ${error.message}`)
+      toast.error(`Error blocking dates: ${error.message}`)
     } else {
-      toast.success("Date successfully blocked!")
-      setSelectedDate('')
+      toast.success(newDatesToInsert.length > 1 ? `${newDatesToInsert.length} dates successfully blocked!` : "Date successfully blocked!")
+      setStartDate('')
+      setEndDate('')
       fetchBlockedDates()
     }
+    
     setIsSubmitting(false)
   }
 
@@ -74,7 +105,6 @@ export default function BlockedDatesManager() {
     }
   }
 
-  // Filter out dates that have already passed so the list doesn't get cluttered forever
   const todayString = new Date().toLocaleDateString('en-CA')
   const upcomingBlockedDates = blockedDates.filter(b => b.date >= todayString)
 
@@ -82,21 +112,32 @@ export default function BlockedDatesManager() {
     <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', border: '1px solid #ddd', marginTop: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
       <h3 style={{ margin: '0 0 5px 0', color: '#2c3e50' }}>Time Off & Blocked Dates</h3>
       <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '20px' }}>
-        Select specific dates when you are closed (holidays, vacations). Clients will not be able to select these days on the calendar.
+        Select specific dates or a date range when you are closed for vacations or holidays. Clients will not be able to select these days on the calendar.
       </p>
 
-      {/* --- ADD BLOCKED DATE FORM --- */}
-      <form onSubmit={handleAddBlockedDate} style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'end', backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '25px' }}>
+      {/* --- ADD BLOCKED DATE(S) FORM --- */}
+      <form onSubmit={handleAddBlockedDates} style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'end', backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '8px', marginBottom: '25px', border: '1px solid #eaeaea' }}>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
-          <label style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>Select a Date to Block</label>
+          <label style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>Start Date</label>
           <input 
             type="date" 
-            value={selectedDate} 
-            onChange={(e) => setSelectedDate(e.target.value)} 
+            value={startDate} 
+            onChange={(e) => setStartDate(e.target.value)} 
             required
             min={todayString}
-            style={{ padding: '9px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '0.95rem', fontFamily: 'sans-serif' }}
+            style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '16px', fontFamily: 'sans-serif' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
+          <label style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>End Date (Optional)</label>
+          <input 
+            type="date" 
+            value={endDate} 
+            onChange={(e) => setEndDate(e.target.value)} 
+            min={startDate || todayString} // Prevents selecting an end date before the start date
+            style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '16px', fontFamily: 'sans-serif' }}
           />
         </div>
 
@@ -104,9 +145,9 @@ export default function BlockedDatesManager() {
           variant="primary" 
           type="submit" 
           disabled={isSubmitting}
-          style={{ height: '42px', padding: '0 25px', backgroundColor: isSubmitting ? '#fca5a5' : '#D9534F', border: 'none' }}
+          style={{ height: '44px', padding: '0 25px', backgroundColor: isSubmitting ? '#fca5a5' : '#D9534F', border: 'none', flex: '1 1 150px' }}
         >
-          {isSubmitting ? 'Blocking...' : 'Block Date'}
+          {isSubmitting ? 'Blocking...' : (endDate && endDate !== startDate ? 'Block Range' : 'Block Date')}
         </Button>
       </form>
 
