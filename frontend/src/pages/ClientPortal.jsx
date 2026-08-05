@@ -19,6 +19,10 @@ export default function ClientPortal() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cancellingId, setCancellingId] = useState(null)
 
+  // --- STRIPE: State for the Event Confirmation Modal ---
+  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+
   useEffect(() => {
     fetchUserAccount() 
     fetchServices()
@@ -26,7 +30,32 @@ export default function ClientPortal() {
     fetchMyAppointments()
     fetchAvailability() 
     fetchBlockedDates()
+    handleStripeRedirects() // <-- STRIPE: Checks if they just returned from payment
   }, [])
+
+  // --- STRIPE: Handle returning from checkout ---
+  const handleStripeRedirects = async () => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const success = urlParams.get('event_success')
+    const canceled = urlParams.get('event_canceled')
+    const regId = urlParams.get('reg_id')
+
+    if (success && regId) {
+      // Mark their spot as officially registered!
+      await supabase.from('event_registrations').update({ status: 'registered' }).eq('id', regId)
+      toast.success('Payment successful! Your spot is secured. 🎉', { duration: 8000 })
+      window.history.replaceState(null, '', window.location.pathname) 
+      fetchEvents()
+    }
+
+    if (canceled && regId) {
+      // Remove the pending registration if they backed out of Stripe
+      await supabase.from('event_registrations').delete().eq('id', regId)
+      toast.error('Payment was canceled. Your spot was not reserved.')
+      window.history.replaceState(null, '', window.location.pathname) 
+      fetchEvents()
+    }
+  }
 
   const fetchUserAccount = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -39,7 +68,7 @@ export default function ClientPortal() {
     const today = new Date().toLocaleDateString('en-CA')
     const { data, error } = await supabase
       .from('events')
-      .select('*, event_registrations(id, client_id)')
+      .select('*, event_registrations(id, client_id, status)')
       .gte('event_date', today)
       .order('event_date', { ascending: true })
     
@@ -107,18 +136,13 @@ export default function ClientPortal() {
   }
 
   const availableDaysOfWeek = availability.map(a => a.day_of_week)
-
-  const isDaySelectable = (date) => {
-    const day = date.getDay()
-    return availableDaysOfWeek.includes(day)
-  }
+  const isDaySelectable = (date) => availableDaysOfWeek.includes(date.getDay())
 
   const getAvailableTimeSlots = () => {
     if (!date || !selectedService || availability.length === 0) return []
     
     const dayOfWeek = date.getDay()
     const dayRules = availability.filter(a => a.day_of_week === dayOfWeek)
-    
     if (dayRules.length === 0) return []
 
     const selectedServiceObj = services.find(s => s.id === selectedService)
@@ -170,74 +194,69 @@ export default function ClientPortal() {
     const [year, month, day] = appointmentDate.split('-').map(Number)
     const [hour, minute] = startTime.substring(0, 5).split(':').map(Number)
     const aptDateTime = new Date(year, month - 1, day, hour, minute)
-    const now = new Date()
-    return ((aptDateTime - now) / (1000 * 60 * 60)) >= 24
+    return ((aptDateTime - new Date()) / (1000 * 60 * 60)) >= 24
   }
 
-  const handleRegisterEvent = async (event) => {
+  // --- STRIPE: Process the payment & registration ---
+  const handleConfirmAndPay = async () => {
     if (!clientName.trim()) {
-      toast.error("Please enter your Full Name in the booking form below before registering for an event.")
+      toast.error("Please enter your Full Name in the booking form below before registering.")
       return
     }
 
+    setIsProcessingPayment(true)
     const { data: { user } } = await supabase.auth.getUser()
     
-    const alreadyRegistered = event.event_registrations?.some(reg => reg.client_id === user.id)
-    if (alreadyRegistered) {
-      toast.error("You are already registered for this event!")
-      return
-    }
-
-    if (event.event_registrations?.length >= event.total_spots) {
-      toast.error("Sorry, this event is completely full.")
-      return
-    }
-
-    const { error } = await supabase.from('event_registrations').insert([
-      {
-        event_id: event.id,
+    // 1. Create a "pending" registration in the database
+    const { data: regData, error: regError } = await supabase
+      .from('event_registrations')
+      .insert([{
+        event_id: selectedEvent.id,
         client_id: user.id,
         client_name: clientName,
-        client_email: user.email
-      }
-    ])
+        client_email: user.email,
+        status: 'pending_payment' // They don't take a spot until they pay
+      }])
+      .select()
+      .single()
 
-    if (error) {
-      toast.error(`Registration failed: ${error.message}`)
-    } else {
-      toast.success(
-        (t) => (
-          <div>
-            <strong>Spot Secured! 🎉</strong>
-            <p style={{ margin: '5px 0' }}>Your registration for {event.title} is confirmed.</p>
-            <p style={{ margin: '5px 0', fontSize: '0.9rem' }}>
-              Please finalize your spot by submitting your payment of <strong>${event.price}</strong> via:<br/><br/>
-              • <strong>Venmo:</strong> @DonnaLorence<br/>
-              • <strong>Zelle:</strong> 845-642-7262
-            </p>
-          </div>
-        ),
-        { duration: 10000 }
-      )
-      fetchEvents() 
+    if (regError) {
+      toast.error(`Error: ${regError.message}`)
+      setIsProcessingPayment(false)
+      return
+    }
+
+    // 2. Ask the Edge Function to create a Stripe Checkout page
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          eventName: selectedEvent.title,
+          price: selectedEvent.price,
+          clientEmail: user.email,
+          successUrl: `${window.location.origin}/?event_success=true&reg_id=${regData.id}`,
+          cancelUrl: `${window.location.origin}/?event_canceled=true&reg_id=${regData.id}`
+        }
+      })
+
+      if (error || !data?.url) throw new Error("Could not reach Stripe.")
+
+      // 3. Redirect the client to the secure Stripe page
+      window.location.href = data.url 
+
+    } catch (err) {
+      console.error(err)
+      toast.error("Error connecting to payment processor. Please try again.")
+      // Delete the pending registration if Stripe failed to load
+      await supabase.from('event_registrations').delete().eq('id', regData.id)
+      setIsProcessingPayment(false)
     }
   }
 
   const handleBooking = async (e) => {
     e.preventDefault()
-    
-    if (!clientName.trim()) {
-      toast.error("Please enter your name.")
-      return
-    }
-    if (!selectedService) {
-      toast.error("Please select a healing service for your session.")
-      return
-    }
-    if (!date || !time) {
-      toast.error("Please select both a valid date and time slot.")
-      return
-    }
+    if (!clientName.trim()) { toast.error("Please enter your name."); return }
+    if (!selectedService) { toast.error("Please select a healing service for your session."); return }
+    if (!date || !time) { toast.error("Please select both a valid date and time slot."); return }
 
     setIsSubmitting(true)
     const formattedDate = date.toLocaleDateString('en-CA') 
@@ -249,30 +268,19 @@ export default function ClientPortal() {
       .from('appointments')
       .insert([
         {
-          client_id: user.id,
-          client_email: user.email, 
-          client_name: clientName, 
-          service_id: selectedService,
-          appointment_date: formattedDate,
-          start_time: time,
-          status: 'pending'
+          client_id: user.id, client_email: user.email, client_name: clientName, 
+          service_id: selectedService, appointment_date: formattedDate, start_time: time, status: 'pending'
         }
       ])
 
-    if (error) {
-      toast.error(`Database Error: ${error.message}`)
-      setIsSubmitting(false)
-      return
-    } 
+    if (error) { toast.error(`Database Error: ${error.message}`); setIsSubmitting(false); return } 
 
     try {
       await supabase.functions.invoke('send-email', {
         body: { 
-          clientEmail: user.email, 
-          clientName: clientName, 
+          clientEmail: user.email, clientName: clientName, 
           serviceName: services.find(s => s.id === selectedService)?.name,
-          date: formattedDate,
-          time: formatDisplayTime(time),
+          date: formattedDate, time: formatDisplayTime(time),
           duration: services.find(s => s.id === selectedService)?.duration_minutes || 60,
           price: services.find(s => s.id === selectedService)?.price || 0,
           status: 'pending'
@@ -281,52 +289,37 @@ export default function ClientPortal() {
       toast.success('Your session has been successfully requested!')
     } catch (emailError) {
       console.error("Email failed to send:", emailError)
-      toast.success('Session requested, but there was an issue sending the email receipt.')
     }
 
-    setSelectedService('')
-    setDate(null)
-    setTime(null)
-    fetchMyAppointments() 
-    setIsSubmitting(false)
+    setSelectedService(''); setDate(null); setTime(null)
+    fetchMyAppointments(); setIsSubmitting(false)
   }
 
   const handleCancelAppointment = async (apt) => {
     if (!canCancel(apt.appointment_date, apt.start_time)) {
-      toast.error("Appointments cannot be cancelled within 24 hours of the start time.")
-      return
+      toast.error("Appointments cannot be cancelled within 24 hours of the start time."); return
     }
-
     setCancellingId(apt.id)
-    const { error } = await supabase
-      .from('appointments')
-      .update({ status: 'cancelled' })
-      .eq('id', apt.id)
-
-    if (error) {
-      toast.error(`Error cancelling appointment: ${error.message}`)
-      setCancellingId(null)
-      return
-    }
-
+    const { error } = await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', apt.id)
+    if (error) { toast.error(`Error: ${error.message}`); setCancellingId(null); return }
+    
     toast.success('Appointment successfully cancelled.')
     fetchMyAppointments()
-
+    
     try {
       const { data: { user } } = await supabase.auth.getUser()
       await supabase.functions.invoke('send-email', {
         body: {
-          clientEmail: user.email,
-          clientName: clientName || 'there',
+          clientEmail: user.email, clientName: clientName || 'there',
           serviceName: apt.services?.name ?? 'Healing Session',
-          date: apt.appointment_date,
-          time: formatDisplayTime(apt.start_time),
+          date: apt.appointment_date, time: formatDisplayTime(apt.start_time),
           status: 'cancelled',
         },
       })
     } catch (emailErr) {
       console.error('Cancellation email failed:', emailErr)
     }
+    
     setCancellingId(null)
   }
 
@@ -336,18 +329,45 @@ export default function ClientPortal() {
     <>
       <Navbar />
       
-      {/* --- ADDED MOBILE PADDING & WIDTH LIMITS --- */}
+      {/* --- STRIPE: The Confirmation & Payment Modal --- */}
+      {selectedEvent && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ backgroundColor: '#fff', padding: '30px', borderRadius: '12px', maxWidth: '450px', width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '1.4rem' }}>Confirm Registration</h3>
+            <p style={{ color: '#666', margin: '0 0 20px 0', lineHeight: '1.5' }}>
+              You are about to secure your spot for <strong>{selectedEvent.title}</strong> on {new Date(`${selectedEvent.event_date}T00:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}.
+            </p>
+            
+            <div style={{ backgroundColor: '#f9fafb', padding: '15px', borderRadius: '8px', marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #eaeaea' }}>
+              <span style={{ fontWeight: '500', color: '#374151' }}>Total Due:</span>
+              <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#899E8B' }}>${selectedEvent.price}</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button 
+                onClick={handleConfirmAndPay}
+                disabled={isProcessingPayment}
+                style={{ padding: '14px', backgroundColor: '#899E8B', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '1.05rem', fontWeight: 'bold', cursor: isProcessingPayment ? 'not-allowed' : 'pointer', opacity: isProcessingPayment ? 0.7 : 1 }}
+              >
+                {isProcessingPayment ? 'Connecting to Stripe...' : 'Pay with Card & Secure Spot'}
+              </button>
+              <button 
+                onClick={() => setSelectedEvent(null)}
+                disabled={isProcessingPayment}
+                style={{ padding: '14px', backgroundColor: 'transparent', color: '#666', border: '1px solid #ccc', borderRadius: '8px', fontSize: '1rem', cursor: isProcessingPayment ? 'not-allowed' : 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-friendly container limits */}
       <div style={{ maxWidth: '100%', width: '100%', padding: '15px', boxSizing: 'border-box' }}>
         <div style={{ maxWidth: '700px', margin: '20px auto 40px auto' }}>
           
-          <div style={{ 
-            backgroundColor: '#F4F1EA', 
-            padding: '25px 15px', 
-            borderRadius: '12px', 
-            textAlign: 'center', 
-            marginBottom: '30px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-          }}>
+          <div style={{ backgroundColor: '#F4F1EA', padding: '25px 15px', borderRadius: '12px', textAlign: 'center', marginBottom: '30px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#899E8B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '10px' }}>
               <path d="M12 2a10 10 0 0 1 7.54 16.6l-1.08-1.08A8 8 0 1 0 12 20v2a10 10 0 0 1 0-20z"></path>
               <path d="M12 6v6l4 2"></path>
@@ -364,9 +384,10 @@ export default function ClientPortal() {
                 ✨ Upcoming Special Events
               </h3>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
                 {events.map(ev => {
-                  const registeredCount = ev.event_registrations?.length || 0;
+                  // Only count registrations that actually paid
+                  const registeredCount = ev.event_registrations?.filter(r => r.status === 'registered').length || 0;
                   const isFull = registeredCount >= ev.total_spots;
 
                   return (
@@ -374,33 +395,24 @@ export default function ClientPortal() {
                       {ev.image_url && (
                         <div style={{ height: '140px', backgroundImage: `url(${ev.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
                       )}
-                      <div style={{ padding: '20px' }}>
-                        <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50', fontSize: '1.2rem' }}>{ev.title}</h4>
-                        <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '0.95rem' }}>
-                          📅 {new Date(`${ev.event_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}<br/>
+                      <div style={{ padding: '15px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50', fontSize: '1.1rem' }}>{ev.title}</h4>
+                        <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '0.9rem' }}>
+                          📅 {new Date(`${ev.event_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}<br/>
                           ⏰ {formatDisplayTime(ev.start_time)}<br/>
                           🎟️ {ev.total_spots - registeredCount} spots remaining
                         </p>
                         
                         {ev.description && (
-                          <p style={{ fontSize: '0.9rem', color: '#555', marginBottom: '15px' }}>{ev.description}</p>
+                          <p style={{ fontSize: '0.85rem', color: '#555', marginBottom: '15px' }}>{ev.description}</p>
                         )}
                         
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
-                          <strong style={{ fontSize: '1.2rem', color: '#899E8B' }}>${ev.price}</strong>
+                          <strong style={{ fontSize: '1.1rem', color: '#899E8B' }}>${ev.price}</strong>
                           <button 
-                            onClick={() => handleRegisterEvent(ev)}
+                            onClick={() => setSelectedEvent(ev)}
                             disabled={isFull}
-                            style={{
-                              padding: '10px 15px',
-                              backgroundColor: isFull ? '#ccc' : '#899E8B',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: isFull ? 'not-allowed' : 'pointer',
-                              fontWeight: '600',
-                              fontSize: '0.9rem'
-                            }}
+                            style={{ padding: '10px 15px', backgroundColor: isFull ? '#ccc' : '#899E8B', color: '#fff', border: 'none', borderRadius: '6px', cursor: isFull ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '0.9rem' }}
                           >
                             {isFull ? 'Sold Out' : 'Secure My Spot'}
                           </button>
@@ -434,7 +446,7 @@ export default function ClientPortal() {
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '10px', fontWeight: '500', color: '#2c3e50', fontSize: '0.95rem' }}>How can we help you heal today?</label>
+                <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#2c3e50', fontSize: '0.95rem' }}>How can we help you heal today?</label>
                 <div className="services-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
                   {services.map(service => (
                     <div 
@@ -473,6 +485,7 @@ export default function ClientPortal() {
                     required
                     disabled={isSubmitting}
                     wrapperClassName="date-picker-wrapper"
+                    className="mobile-datepicker-input"
                   />
                 </div>
               </div>
