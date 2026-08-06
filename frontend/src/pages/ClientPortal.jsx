@@ -207,7 +207,6 @@ export default function ClientPortal() {
     setIsProcessingPayment(true)
     const { data: { user } } = await supabase.auth.getUser()
     
-    // 1. Create a "pending" registration in the database
     const { data: regData, error: regError } = await supabase
       .from('event_registrations')
       .insert([{
@@ -215,7 +214,7 @@ export default function ClientPortal() {
         client_id: user.id,
         client_name: clientName,
         client_email: user.email,
-        status: 'pending_payment' // They don't take a spot until they pay
+        status: 'pending_payment' 
       }])
       .select()
       .single()
@@ -226,7 +225,6 @@ export default function ClientPortal() {
       return
     }
 
-    // 2. Ask the Edge Function to create a Stripe Checkout page
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
@@ -234,19 +232,18 @@ export default function ClientPortal() {
           price: selectedEvent.price,
           clientEmail: user.email,
           successUrl: `${window.location.origin}/?event_success=true&reg_id=${regData.id}`,
-          cancelUrl: `${window.location.origin}/?event_canceled=true&reg_id=${regData.id}`
+          cancelUrl: `${window.location.origin}/?event_canceled=true&reg_id=${regData.id}`,
+          regId: regData.id // <-- NEW: Handing the Database ID directly to Stripe
         }
       })
 
       if (error || !data?.url) throw new Error("Could not reach Stripe.")
 
-      // 3. Redirect the client to the secure Stripe page
       window.location.href = data.url 
 
     } catch (err) {
       console.error(err)
       toast.error("Error connecting to payment processor. Please try again.")
-      // Delete the pending registration if Stripe failed to load
       await supabase.from('event_registrations').delete().eq('id', regData.id)
       setIsProcessingPayment(false)
     }

@@ -17,11 +17,13 @@ serve(async (req) => {
   }
 
   try {
-    const { eventName, price, clientEmail, successUrl, cancelUrl } = await req.json();
+    // --- NEW: Accepting the regId ---
+    const { eventName, price, clientEmail, successUrl, cancelUrl, regId } = await req.json();
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       customer_email: clientEmail,
+      client_reference_id: regId, // <-- NEW: Stripe will remember this ID and send it back later
       line_items: [
         {
           price_data: {
