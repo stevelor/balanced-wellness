@@ -357,7 +357,7 @@ export default function ClientPortal() {
           <div style={{ backgroundColor: '#fff', padding: '30px', borderRadius: '12px', maxWidth: '450px', width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '1.4rem' }}>Confirm Registration</h3>
             <p style={{ color: '#666', margin: '0 0 20px 0', lineHeight: '1.5' }}>
-              You are about to secure your spot for <strong>{selectedEvent.title}</strong> on {new Date(`${selectedEvent.event_date}T00:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}.
+              To secure your spot for <strong>{selectedEvent.title}</strong> on {new Date(`${selectedEvent.event_date}T00:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}, you are required to pay beforehand.
             </p>
             
             <div style={{ backgroundColor: '#f9fafb', padding: '15px', borderRadius: '8px', marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #eaeaea' }}>
