@@ -19,9 +19,10 @@ export default function ClientPortal() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cancellingId, setCancellingId] = useState(null)
 
-  // --- STRIPE: State for the Event Confirmation Modal ---
+  // --- STRIPE & MODAL STATES ---
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
   useEffect(() => {
     fetchUserAccount() 
@@ -30,7 +31,7 @@ export default function ClientPortal() {
     fetchMyAppointments()
     fetchAvailability() 
     fetchBlockedDates()
-    handleStripeRedirects() // <-- STRIPE: Checks if they just returned from payment
+    handleStripeRedirects() 
   }, [])
 
   // --- STRIPE: Handle returning from checkout ---
@@ -41,15 +42,18 @@ export default function ClientPortal() {
     const regId = urlParams.get('reg_id')
 
     if (success && regId) {
-      // Mark their spot as officially registered!
+      // 1. Mark their spot as officially registered in the database!
       await supabase.from('event_registrations').update({ status: 'registered' }).eq('id', regId)
-      toast.success('Payment successful! Your spot is secured. 🎉', { duration: 8000 })
+      
+      // 2. Trigger the big success modal
+      setSuccessMessage('Your payment was confirmed and your spot is secured for the event!')
+      
+      // 3. Clear the URL so it looks clean again
       window.history.replaceState(null, '', window.location.pathname) 
       fetchEvents()
     }
 
     if (canceled && regId) {
-      // Remove the pending registration if they backed out of Stripe
       await supabase.from('event_registrations').delete().eq('id', regId)
       toast.error('Payment was canceled. Your spot was not reserved.')
       window.history.replaceState(null, '', window.location.pathname) 
@@ -197,7 +201,6 @@ export default function ClientPortal() {
     return ((aptDateTime - new Date()) / (1000 * 60 * 60)) >= 24
   }
 
-  // --- STRIPE: Process the payment & registration ---
   const handleConfirmAndPay = async () => {
     if (!clientName.trim()) {
       toast.error("Please enter your Full Name in the booking form below before registering.")
@@ -226,14 +229,17 @@ export default function ClientPortal() {
     }
 
     try {
+      // FIX: Grab the exact current path (like /portal) so Stripe returns them to the right place
+      const currentPath = window.location.pathname;
+
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           eventName: selectedEvent.title,
           price: selectedEvent.price,
           clientEmail: user.email,
-          successUrl: `${window.location.origin}/?event_success=true&reg_id=${regData.id}`,
-          cancelUrl: `${window.location.origin}/?event_canceled=true&reg_id=${regData.id}`,
-          regId: regData.id // <-- NEW: Handing the Database ID directly to Stripe
+          successUrl: `${window.location.origin}${currentPath}?event_success=true&reg_id=${regData.id}`,
+          cancelUrl: `${window.location.origin}${currentPath}?event_canceled=true&reg_id=${regData.id}`,
+          regId: regData.id // Keeping the Webhook ID connection!
         }
       })
 
@@ -326,8 +332,27 @@ export default function ClientPortal() {
     <>
       <Navbar />
       
+      {/* --- NEW: The Payment Success Modal --- */}
+      {successMessage && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100, padding: '20px' }}>
+          <div style={{ backgroundColor: '#fff', padding: '40px 30px', borderRadius: '12px', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+            <div style={{ fontSize: '3.5rem', marginBottom: '15px' }}>✅</div>
+            <h3 style={{ margin: '0 0 15px 0', color: '#2c3e50', fontSize: '1.6rem' }}>You're all set!</h3>
+            <p style={{ color: '#666', margin: '0 0 25px 0', lineHeight: '1.5', fontSize: '1.05rem' }}>
+              {successMessage}
+            </p>
+            <button 
+              onClick={() => setSuccessMessage('')}
+              style={{ padding: '14px', backgroundColor: '#899E8B', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '1.05rem', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* --- STRIPE: The Confirmation & Payment Modal --- */}
-      {selectedEvent && (
+      {selectedEvent && !successMessage && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ backgroundColor: '#fff', padding: '30px', borderRadius: '12px', maxWidth: '450px', width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '1.4rem' }}>Confirm Registration</h3>
