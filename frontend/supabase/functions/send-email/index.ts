@@ -98,7 +98,7 @@ serve(async (req) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
           body: JSON.stringify({
-            from: 'Balanced Wellness <onboarding@resend.dev>', // UPDATE TO YOUR VERIFIED DOMAIN!
+            from: 'Balanced Wellness <hello@healwithdonna.com>', // UPDATE TO YOUR VERIFIED DOMAIN!
             to: [clientEmail],
             subject: clientSubject,
             html: clientHtml,
@@ -114,7 +114,7 @@ serve(async (req) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
           body: JSON.stringify({
-            from: 'Balanced Wellness Admin <onboarding@resend.dev>', // UPDATE TO YOUR VERIFIED DOMAIN!
+            from: 'Balanced Wellness Admin <hello@healwithdonna.com>', // UPDATE TO YOUR VERIFIED DOMAIN!
             to: ADMIN_EMAILS,
             subject: adminSubject,
             html: adminHtml,
