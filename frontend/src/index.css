@@ -71,6 +71,184 @@ input, select, textarea {
   box-sizing: border-box;
 }
 
+/* Client portal: upcoming session cards */
+.upcoming-sessions {
+  margin-top: 4px;
+}
+
+.upcoming-sessions-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.upcoming-sessions-eyebrow {
+  margin: 0 0 3px;
+  color: #899e8b;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.upcoming-sessions h3 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.upcoming-sessions-count {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e5ede4;
+  color: #48604a;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.upcoming-sessions-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upcoming-session-card {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid #e1e6df;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(44, 62, 80, 0.05);
+}
+
+.upcoming-session-date {
+  display: flex;
+  width: 78px;
+  flex: 0 0 78px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f0f4ed;
+  color: #526a54;
+}
+
+.upcoming-session-date span {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.upcoming-session-date strong {
+  color: #2c3e50;
+  font-family: 'Lora', serif;
+  font-size: 1.65rem;
+  line-height: 1.15;
+}
+
+.upcoming-session-content {
+  min-width: 0;
+  flex: 1;
+  padding: 15px 16px;
+}
+
+.upcoming-session-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.session-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.session-status-pending {
+  background: #fdf1ca;
+  color: #855d13;
+}
+
+.session-status-confirmed {
+  background: #dff1e6;
+  color: #256443;
+}
+
+.upcoming-session-time {
+  color: #526a54;
+  font-size: 0.83rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.upcoming-session-content h4 {
+  margin: 8px 0 2px;
+  color: #2c3e50;
+  font-size: 1.02rem;
+}
+
+.upcoming-session-content p {
+  margin: 0;
+  color: #69746d;
+  font-size: 0.83rem;
+}
+
+.upcoming-session-cancel {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: #a94743;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.upcoming-session-cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.upcoming-session-note {
+  display: block;
+  margin-top: 11px;
+  color: #8a8174;
+  font-size: 0.74rem;
+  font-style: italic;
+}
+
+.upcoming-sessions-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 17px;
+  border: 1px dashed #cbd6ca;
+  border-radius: 10px;
+  color: #69746d;
+}
+
+.upcoming-sessions-empty span {
+  color: #899e8b;
+  font-size: 1.2rem;
+}
+
+.upcoming-sessions-empty p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
 /* 4. Enable buttery-smooth sideways scrolling for the Admin Tables on iOS */
 .data-table-container {
   overflow-x: auto;
@@ -82,5 +260,14 @@ input, select, textarea {
   /* Make the grid items stack top-to-bottom on phones */
   .services-grid {
     grid-template-columns: 1fr !important; 
+  }
+
+  .upcoming-session-date {
+    width: 68px;
+    flex-basis: 68px;
+  }
+
+  .upcoming-session-content {
+    padding: 13px;
   }
 }

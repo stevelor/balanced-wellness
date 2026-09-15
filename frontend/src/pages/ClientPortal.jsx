@@ -129,10 +129,13 @@ export default function ClientPortal() {
   const fetchMyAppointments = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
+      const today = new Date().toLocaleDateString('en-CA')
       const { data, error } = await supabase
         .from('appointments')
         .select(`id, appointment_date, start_time, status, client_email, services (name)`)
         .eq('client_id', user.id)
+        .gte('appointment_date', today)
+        .neq('status', 'cancelled')
         .order('appointment_date', { ascending: true })
 
       if (!error) setMyAppointments(data)
@@ -192,6 +195,15 @@ export default function ClientPortal() {
     const ampm = hour >= 12 ? 'PM' : 'AM'
     hour = hour % 12 || 12
     return `${hour}:${minuteStr} ${ampm}`
+  }
+
+  const formatAppointmentDate = (dateString) => {
+    const [year, month, day] = dateString.split('-').map(Number)
+    return new Date(year, month - 1, day).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'long',
+      day: 'numeric',
+    })
   }
 
   const canCancel = (appointmentDate, startTime) => {
@@ -576,57 +588,55 @@ export default function ClientPortal() {
             </form>
           </div>
 
-          <div>
-            <h3 style={{ fontSize: '1.2rem', marginBottom: '15px' }}>Your Upcoming 1-on-1 Sessions</h3>
+          <section className="upcoming-sessions" aria-labelledby="upcoming-sessions-title">
+            <div className="upcoming-sessions-heading">
+              <div>
+                <p className="upcoming-sessions-eyebrow">Your schedule</p>
+                <h3 id="upcoming-sessions-title">Upcoming 1-on-1 Sessions</h3>
+              </div>
+              {myAppointments.length > 0 && <span className="upcoming-sessions-count">{myAppointments.length}</span>}
+            </div>
             {myAppointments.length === 0 ? (
-              <p style={{ color: '#666', fontSize: '0.95rem' }}>You have no upcoming sessions at this time.</p>
+              <div className="upcoming-sessions-empty">
+                <span aria-hidden="true">✦</span>
+                <p>You have no upcoming sessions at this time.</p>
+              </div>
             ) : (
-              <ul style={{ listStyleType: 'none', padding: 0 }}>
+              <ul className="upcoming-sessions-list">
                 {myAppointments.map((apt) => {
                   const isWithin24Hours = !canCancel(apt.appointment_date, apt.start_time)
                   return (
-                    <li key={apt.id} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '10px', borderRadius: '8px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div>
-                        <strong style={{ fontSize: '1.05em', display: 'block', color: '#2c3e50' }}>{apt.services?.name}</strong>
-                        <span style={{ color: '#666', display: 'block', margin: '5px 0', fontSize: '0.9rem' }}>Date: {apt.appointment_date} at {formatDisplayTime(apt.start_time)}</span>
-                        <span style={{ display: 'inline-block', marginTop: '5px', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', fontWeight: '500', backgroundColor: apt.status === 'pending' ? '#FDE68A' : apt.status === 'confirmed' ? '#D1FAE5' : '#FEE2E2', color: apt.status === 'pending' ? '#92400E' : apt.status === 'confirmed' ? '#065F46' : '#991B1B' }}>
-                          {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
-                        </span>
+                    <li key={apt.id} className="upcoming-session-card">
+                      <div className="upcoming-session-date" aria-label={formatAppointmentDate(apt.appointment_date)}>
+                        <span>{new Date(`${apt.appointment_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</span>
+                        <strong>{new Date(`${apt.appointment_date}T00:00:00`).getDate()}</strong>
                       </div>
-
-                      {(apt.status === 'pending' || apt.status === 'confirmed') && (
-                        isWithin24Hours ? (
-                          <span style={{ fontSize: '0.85rem', color: '#888', fontStyle: 'italic' }}>
-                            Cannot cancel within 24h
-                          </span>
+                      <div className="upcoming-session-content">
+                        <div className="upcoming-session-topline">
+                          <span className={`session-status session-status-${apt.status}`}>{apt.status === 'pending' ? 'Awaiting confirmation' : 'Confirmed'}</span>
+                          <span className="upcoming-session-time">{formatDisplayTime(apt.start_time)}</span>
+                        </div>
+                        <h4>{apt.services?.name || 'Healing Session'}</h4>
+                        <p>{formatAppointmentDate(apt.appointment_date)}</p>
+                        {isWithin24Hours ? (
+                          <span className="upcoming-session-note">Changes close 24 hours before your session.</span>
                         ) : (
                           <button
                             type="button"
                             disabled={cancellingId === apt.id}
                             onClick={() => handleCancelAppointment(apt)}
-                            style={{
-                              padding: '10px',
-                              backgroundColor: '#fff',
-                              color: '#D9534F',
-                              border: '1px solid #D9534F',
-                              borderRadius: '6px',
-                              cursor: cancellingId === apt.id ? 'not-allowed' : 'pointer',
-                              fontSize: '0.9rem',
-                              fontWeight: '500',
-                              width: '100%',
-                              textAlign: 'center'
-                            }}
+                            className="upcoming-session-cancel"
                           >
-                            {cancellingId === apt.id ? 'Cancelling...' : 'Cancel Appointment'}
+                            {cancellingId === apt.id ? 'Cancelling…' : 'Cancel session'}
                           </button>
-                        )
-                      )}
+                        )}
+                      </div>
                     </li>
                   )
                 })}
               </ul>
             )}
-          </div>
+          </section>
         </div>
       </div>
     </>
