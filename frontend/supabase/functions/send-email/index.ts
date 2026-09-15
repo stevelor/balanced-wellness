@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const FROM_EMAIL = "Balanced Wellness <hello@healwithdonna.com>";
+// This address must use the domain verified in Resend.
+const FROM_EMAIL = "Balanced Wellness <hello@donnabooking.com>";
 const ADMIN_EMAILS = ["stevenantlor@gmail.com", "healwithdonna@gmail.com"];
 
 const corsHeaders = {
