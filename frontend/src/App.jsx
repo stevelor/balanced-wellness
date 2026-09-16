@@ -13,25 +13,34 @@ import UpdatePassword from './pages/UpdatePassword';
 
 // Protected Route Component to handle access logic
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const [session, setSession] = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    const checkAccess = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
       setLoading(false);
-    });
+    };
+
+    checkAccess();
   }, []);
 
   if (loading) return <div className="loading-text" style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>;
 
-  if (!session) {
+  if (!user) {
     return <Navigate to="/" replace />;
   }
 
-  const userRole = session.user.app_metadata.role;
+  // This is a client-side safety net in addition to Supabase's confirmation setting.
+  // It also blocks a direct visit to a protected route using an unverified session.
+  if (!user.email_confirmed_at) {
+    return <Navigate to="/?verification=required" replace />;
+  }
 
-  if (!allowedRoles.includes(userRole)) {
+  const userRole = user.app_metadata.role;
+
+  if (allowedRoles && !allowedRoles.includes(userRole)) {
     return (
       <div style={{ textAlign: 'center', marginTop: '100px', fontFamily: 'sans-serif' }}>
         <h2>Unauthorized Access</h2>
@@ -69,7 +78,7 @@ function App() {
       
       <Routes>
         <Route path="/" element={<Auth />} />
-        <Route path="/portal" element={<ClientPortal />} />
+        <Route path="/portal" element={<ProtectedRoute><ClientPortal /></ProtectedRoute>} />
 
         <Route
           path="/admin"

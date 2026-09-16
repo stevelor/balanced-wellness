@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient'; 
 
 export default function Auth() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(true);
   const [email, setEmail] = useState('');
@@ -14,7 +15,7 @@ export default function Auth() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && !window.location.hash.includes('type=recovery')) {
+      if (session?.user.email_confirmed_at && !window.location.hash.includes('type=recovery')) {
         navigate('/portal'); 
       } else {
         setIsVerifying(false);
@@ -24,7 +25,7 @@ export default function Auth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         navigate('/update-password');
-      } else if (event === 'SIGNED_IN' && session) {
+      } else if (event === 'SIGNED_IN' && session?.user.email_confirmed_at) {
         if (!window.location.hash.includes('type=recovery')) {
           navigate('/portal');
         }
@@ -39,12 +40,26 @@ export default function Auth() {
     setLoading(true);
     
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: window.location.origin },
+      });
       if (error) alert(error.message); // If you have react-hot-toast imported here, change to toast.error!
-      else alert('Check your email for the confirmation link!');
+      else {
+        // A confirmation email must be acted on before access is granted.
+        // Sign out defensively in case an older auth setting returned a session.
+        if (!data.user?.email_confirmed_at) await supabase.auth.signOut();
+        alert('Check your email and confirm your address before logging in.');
+        setIsSignUp(false);
+      }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) alert(error.message);
+      else if (!data.user?.email_confirmed_at) {
+        await supabase.auth.signOut();
+        alert('Please confirm your email address before signing in. Check your inbox for the confirmation link.');
+      }
     }
     setLoading(false);
   };
@@ -111,6 +126,12 @@ export default function Auth() {
       <p style={{ textAlign: 'center', color: '#666', marginBottom: '25px', fontSize: '0.95rem' }}>
         {isSignUp ? 'Join Balanced Wellness to book sessions.' : 'Log in to manage your healing sessions.'}
       </p>
+
+      {new URLSearchParams(location.search).get('verification') === 'required' && (
+        <p role="alert" style={{ margin: '0 0 20px', padding: '10px 12px', backgroundColor: '#FFF8E7', border: '1px solid #F3D68A', borderRadius: '8px', color: '#7A5712', fontSize: '0.88rem', lineHeight: '1.45' }}>
+          Please confirm your email address before signing in. Check your inbox for the confirmation link.
+        </p>
+      )}
 
       <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
         <div>
