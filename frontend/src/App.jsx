@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import './App.css';
 import { Toaster } from 'react-hot-toast'; // <-- 1. Added the import here
+import { Analytics } from "@vercel/analytics/next";
 
 import Auth from './pages/Auth';
 import ClientPortal from './pages/ClientPortal';
@@ -75,6 +76,7 @@ function App() {
     <BrowserRouter>
       {/* 2. Added the Toaster right here so it sits on top of all pages! */}
       <Toaster position="top-center" />
+      <Analytics />
       
       <Routes>
         <Route path="/" element={<Auth />} />
